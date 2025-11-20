@@ -7,9 +7,16 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
+use App\Http\Controllers\ProductController;
+use App\Http\Controllers\StockTransactionController;
+use App\Http\Controllers\ProfitReportController;
+use App\Http\Controllers\ProductQrLogController;
 
+// Authentication
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
+
+// Email Verification
 Route::get('/email/verify/{id}/{hash}', function (Request $request, $id, $hash) {
     Log::info('=== EMAIL VERIFICATION ATTEMPT ===', [
         'user_id' => $id,
@@ -18,7 +25,6 @@ Route::get('/email/verify/{id}/{hash}', function (Request $request, $id, $hash) 
     ]);
 
     try {
-        // Cari user berdasarkan user_id
         $user = User::where('user_id', $id)->first();
 
         if (!$user) {
@@ -35,7 +41,6 @@ Route::get('/email/verify/{id}/{hash}', function (Request $request, $id, $hash) 
             'verified' => $user->hasVerifiedEmail()
         ]);
 
-        // Validasi hash
         $expectedHash = sha1($user->getEmailForVerification());
         if (!hash_equals($expectedHash, (string) $hash)) {
             Log::error('Invalid hash', [
@@ -48,7 +53,6 @@ Route::get('/email/verify/{id}/{hash}', function (Request $request, $id, $hash) 
             ], 400);
         }
 
-        // Validasi signature
         if (!URL::hasValidSignature($request)) {
             Log::error('Invalid signature');
             return response()->json([
@@ -57,7 +61,6 @@ Route::get('/email/verify/{id}/{hash}', function (Request $request, $id, $hash) 
             ], 400);
         }
 
-        // Cek jika sudah verified
         if ($user->hasVerifiedEmail()) {
             Log::info('Email already verified');
             return response()->json([
@@ -66,7 +69,6 @@ Route::get('/email/verify/{id}/{hash}', function (Request $request, $id, $hash) 
             ], 200);
         }
 
-        // Mark sebagai verified
         $user->markEmailAsVerified();
         Log::info('Email verified successfully', ['user_id' => $user->user_id]);
 
@@ -89,7 +91,6 @@ Route::get('/email/verify/{id}/{hash}', function (Request $request, $id, $hash) 
     }
 })->name('verification.verify');
 
-// Resend Verification Email
 Route::post('/email/resend', function (Request $request) {
     $request->validate(['email' => 'required|email']);
 
@@ -113,7 +114,7 @@ Route::post('/email/resend', function (Request $request) {
         'verification.verify',
         now()->addMinutes(60),
         [
-            'id' => $user->user_id, // ← Pakai user_id
+            'id' => $user->user_id,
             'hash' => sha1($user->email),
         ]
     );
@@ -132,11 +133,85 @@ Route::post('/email/resend', function (Request $request) {
     ], 200);
 });
 
-// Protected Routes
+Route::prefix('dev')->group(function () {
+    // Products
+    Route::get('/products', [ProductController::class, 'index']);
+    Route::get('/products/{id}', [ProductController::class, 'show']);
+    Route::post('/products', [ProductController::class, 'store']);
+    Route::put('/products/{id}', [ProductController::class, 'update']);
+    Route::delete('/products/{id}', [ProductController::class, 'destroy']);
+    Route::post('/products/scan-qr', [ProductController::class, 'scanQr']);
+
+    // Stock Transactions
+    Route::get('/stock-transactions', [StockTransactionController::class, 'index']);
+    Route::get('/stock-transactions/{id}', [StockTransactionController::class, 'show']);
+    Route::post('/stock-transactions', [StockTransactionController::class, 'store']);
+    Route::get('/stock-transactions/product/{productId}', [StockTransactionController::class, 'getByProduct']);
+    Route::get('/stock-transactions/summary/all', [StockTransactionController::class, 'summary']);
+
+    // Profit Reports
+    Route::get('/profit-reports', [ProfitReportController::class, 'index']);
+    Route::get('/profit-reports/{id}', [ProfitReportController::class, 'show']);
+    Route::post('/profit-reports/generate', [ProfitReportController::class, 'generate']);
+    Route::post('/profit-reports/generate/daily', [ProfitReportController::class, 'generateDaily']);
+    Route::post('/profit-reports/generate/weekly', [ProfitReportController::class, 'generateWeekly']);
+    Route::post('/profit-reports/generate/monthly', [ProfitReportController::class, 'generateMonthly']);
+    Route::get('/profit-reports/summary/all', [ProfitReportController::class, 'summary']);
+
+    // QR Logs
+    Route::get('/qr-logs', [ProductQrLogController::class, 'index']);
+    Route::get('/qr-logs/{id}', [ProductQrLogController::class, 'show']);
+    Route::get('/qr-logs/product/{productId}', [ProductQrLogController::class, 'getByProduct']);
+    Route::get('/qr-logs/statistics/all', [ProductQrLogController::class, 'statistics']);
+});
+
 Route::middleware('auth:sanctum')->group(function () {
+    
+    // Auth Routes
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', fn(Request $request) => $request->user());
 
+    // Products Routes
+    Route::prefix('products')->group(function () {
+        Route::get('/', [ProductController::class, 'index']);
+        Route::get('/{id}', [ProductController::class, 'show']);
+        Route::post('/', [ProductController::class, 'store']);
+        Route::put('/{id}', [ProductController::class, 'update']);
+        Route::delete('/{id}', [ProductController::class, 'destroy']);
+        Route::post('/scan-qr', [ProductController::class, 'scanQr']);
+    });
+
+    // Stock Transactions Routes
+    Route::prefix('stock-transactions')->group(function () {
+        Route::get('/', [StockTransactionController::class, 'index']);
+        Route::get('/{id}', [StockTransactionController::class, 'show']);
+        Route::post('/', [StockTransactionController::class, 'store']);
+        Route::get('/product/{productId}', [StockTransactionController::class, 'getByProduct']);
+        Route::get('/summary/all', [StockTransactionController::class, 'summary']);
+    });
+
+    // Profit Reports Routes
+    Route::prefix('profit-reports')->group(function () {
+        Route::get('/', [ProfitReportController::class, 'index']);
+        Route::get('/{id}', [ProfitReportController::class, 'show']);
+        Route::delete('/{id}', [ProfitReportController::class, 'destroy']);
+        Route::post('/generate', [ProfitReportController::class, 'generate']);
+        Route::post('/generate/daily', [ProfitReportController::class, 'generateDaily']);
+        Route::post('/generate/weekly', [ProfitReportController::class, 'generateWeekly']);
+        Route::post('/generate/monthly', [ProfitReportController::class, 'generateMonthly']);
+        Route::get('/summary/all', [ProfitReportController::class, 'summary']);
+    });
+
+    // QR Logs Routes
+    Route::prefix('qr-logs')->group(function () {
+        Route::get('/', [ProductQrLogController::class, 'index']);
+        Route::get('/{id}', [ProductQrLogController::class, 'show']);
+        Route::delete('/{id}', [ProductQrLogController::class, 'destroy']);
+        Route::get('/product/{productId}', [ProductQrLogController::class, 'getByProduct']);
+        Route::get('/statistics/all', [ProductQrLogController::class, 'statistics']);
+    });
+
+    // Admin Only Routes
     Route::middleware('admin')->group(function () {
         Route::get('/admin', fn() => response()->json(['message' => 'Admin access granted']));
     });

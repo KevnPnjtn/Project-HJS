@@ -1,0 +1,200 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Product;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
+use SimpleSoftwareIO\QrCode\Facades\QrCode;
+
+class ProductController extends Controller
+{
+    public function index(Request $request)
+    {
+        $query = Product::with('user');
+
+        if ($request->has('status')) {
+            if ($request->status === 'Tersedia') {
+                $query->tersedia();
+            } elseif ($request->status === 'Habis') {
+                $query->habis();
+            }
+        }
+
+        if ($request->has('stok_minimal') && $request->stok_minimal == true) {
+            $query->stokMinimal();
+        }
+
+        if ($request->has('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('nama_barang', 'like', "%{$search}%")
+                  ->orWhere('kode_barang', 'like', "%{$search}%")
+                  ->orWhere('jenis_barang', 'like', "%{$search}%");
+            });
+        }
+
+        $products = $query->latest()->paginate($request->per_page ?? 15);
+
+        return response()->json([
+            'success' => true,
+            'data' => $products
+        ]);
+    }
+
+    public function show($id)
+    {
+        $product = Product::with(['user', 'qrLogs', 'stockTransactions'])->find($id);
+
+        if (!$product) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Product not found'
+            ], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $product
+        ]);
+    }
+
+public function store(Request $request)
+{
+    $validator = Validator::make($request->all(), [
+        'kode_barang' => 'required|string|max:50|unique:products,kode_barang',
+        'nama_barang' => 'required|string|max:255',
+        'jenis_barang' => 'nullable|string|max:255',
+        'satuan' => 'required|string|max:50',
+        'stok_minimal' => 'nullable|integer|min:0',
+        'stok' => 'nullable|integer|min:0',
+        'harga_modal' => 'required|numeric|min:0',
+        'harga_jual' => 'required|numeric|min:0',
+        'user_id' => 'nullable|exists:users,user_id',
+    ]);
+
+    if ($validator->fails()) {
+        return response()->json([
+            'success' => false,
+            'errors' => $validator->errors()
+        ], 422);
+    }
+
+    try {
+        \DB::beginTransaction();
+
+        $product = Product::create($request->all());
+
+        try {
+            $qrCode = QrCode::size(300)->generate($product->uuid);
+            $product->qr_code = $qrCode;
+            $product->save();
+        } catch (\Exception $e) {
+            \Log::error('QR Code generation failed: ' . $e->getMessage());
+        }
+
+        \DB::commit();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Product created successfully',
+            'data' => $product->fresh()
+        ], 201);
+
+    } catch (\Exception $e) {
+        \DB::rollBack();
+        \Log::error('Product creation failed: ' . $e->getMessage());
+        
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to create product',
+            'error' => $e->getMessage()
+        ], 500);
+    }
+}
+
+    public function update(Request $request, $id)
+    {
+        $product = Product::find($id);
+
+        if (!$product) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Product not found'
+            ], 404);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'kode_barang' => 'sometimes|string|max:50|unique:products,kode_barang,' . $id . ',product_id',
+            'nama_barang' => 'sometimes|string|max:255',
+            'jenis_barang' => 'nullable|string|max:255',
+            'satuan' => 'sometimes|string|max:50',
+            'stok_minimal' => 'nullable|integer|min:0',
+            'stok' => 'nullable|integer|min:0',
+            'harga_modal' => 'sometimes|numeric|min:0',
+            'harga_jual' => 'sometimes|numeric|min:0',
+            'user_id' => 'nullable|exists:users,user_id',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        $product->update($request->all());
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Product updated successfully',
+            'data' => $product
+        ]);
+    }
+
+    public function destroy($id)
+    {
+        $product = Product::find($id);
+
+        if (!$product) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Product not found'
+            ], 404);
+        }
+
+        $product->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Product deleted successfully'
+        ]);
+    }
+
+    public function scanQr(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'uuid' => 'required|string|exists:products,uuid',
+            'scanned_by' => 'nullable|string'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        $product = Product::where('uuid', $request->uuid)->first();
+
+        $product->qrLogs()->create([
+            'scanned_by' => $request->scanned_by
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'QR Code scanned successfully',
+            'data' => $product
+        ]);
+    }
+}

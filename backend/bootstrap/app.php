@@ -14,8 +14,6 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware) {
         
-        // MENAMBAHKAN HandleCors ke SEMUA RUTE (GLOBAL)
-        // Ini adalah cara paling pasti untuk memastikan CORS aktif
         $middleware->use([
             \Illuminate\Http\Middleware\HandleCors::class,
         ]);
