@@ -28,7 +28,6 @@ const DashboardPageAdmin = () => {
   }, []);
 
   useEffect(() => {
-    // Filter transactions by period
     const { start, end } = getDateRange(period);
     
     let filtered = recentTransactions;

@@ -1,10 +1,9 @@
 import { ArrowLeft, Eye, EyeOff, Mail, Lock, Loader } from "lucide-react";
-import React, { useState } from "react";
+import React, { useState, useCallback, memo } from "react";
 import { login } from "../../services/auth";
-import { Link, useNavigate } from "react-router-dom"; 
+import { Link, useNavigate } from "react-router-dom";
 
-
-function Login() {
+const Login = memo(() => {
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -14,83 +13,81 @@ function Login() {
   const [rememberMe, setRememberMe] = useState(false);
 
   const navigate = useNavigate();
-
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  setError("");
-  setSuccess("");
-
-  if (!email || !password) {
-    setError("Email dan password harus diisi");
-    return;
-  }
-
-  try {
-    setLoading(true);
-
-    const res = await login({ email, password });
-    
-    console.log("✅ Login response:", res.data);
-    
-    const { token, user } = res.data;
-
-    const storage = rememberMe ? localStorage : sessionStorage;
-
-    storage.setItem("accessToken", token); 
-    storage.setItem("user", JSON.stringify(user));
-    
-    const isVerified = user.email_verified_at ? "true" : "false";
-    storage.setItem("emailVerified", isVerified);
-    
-    console.log("📧 Email verified status:", isVerified);
-
-    if (!user.email_verified_at) {
-      setError("Akun belum terverifikasi. Silakan cek email Anda untuk verifikasi.");
-      
-      storage.removeItem("accessToken");
-      storage.removeItem("user");
-      storage.removeItem("emailVerified");
-      
+  const handleSubmit = useCallback(async (e) => {
+    e.preventDefault();
+    setError("");
+    setSuccess("");
+    if (!email || !password) {
+      setError("Email dan password harus diisi");
       return;
     }
 
-    const userRole = user.role || 'user'; 
-    
-    console.log("👤 User role:", userRole);
-
-    setSuccess("Login berhasil! Mengalihkan...");
-    
-    setTimeout(() => {
-      if (userRole === 'admin') {
-        console.log("🔀 Redirecting to admin dashboard");
-        navigate("/dashboard-admin");  
-      } else {
-        console.log("🔀 Redirecting to user dashboard");
-        navigate("/dashboard-user");    
-      }
-    }, 800);
-
-  } catch (err) {
-    console.error("❌ Login error:", err);
-    
-    let errorMessage = "Email atau password salah.";
-    
-    if (err?.response?.data?.message) {
-      errorMessage = err.response.data.message;
+    // ✅ Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setError("Format email tidak valid");
+      return;
     }
-    
-    setError(errorMessage);
-  } finally {
-    setLoading(false);
-  }
-};
+
+    try {
+      setLoading(true);
+      const res = await login({ email, password });
+      const { token, user } = res.data;
+      const storage = rememberMe ? localStorage : sessionStorage;
+
+      storage.setItem("accessToken", token);
+      storage.setItem("user", JSON.stringify(user));
+      
+      const isVerified = user.email_verified_at ? "true" : "false";
+      storage.setItem("emailVerified", isVerified);
+
+      if (!user.email_verified_at) {
+        setError("Akun belum terverifikasi. Silakan cek email Anda untuk verifikasi.");
+        storage.removeItem("accessToken");
+        storage.removeItem("user");
+        storage.removeItem("emailVerified");
+        
+        return;
+      }
+
+      const userRole = user.role || 'user';
+      setSuccess("Login berhasil! Mengalihkan...");
+      if (userRole === 'admin') {
+        navigate("/dashboard-admin", { replace: true });
+      } else {
+        navigate("/dashboard-user", { replace: true });
+      }
+
+    } catch (err) {
+      console.error("❌ Login error:", err);
+      let errorMessage = "Email atau password salah.";
+      
+      if (err?.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err?.message === "Network Error") {
+        errorMessage = "Koneksi jaringan bermasalah. Silakan coba lagi.";
+      } else if (err?.code === "ECONNABORTED") {
+        errorMessage = "Request timeout. Silakan coba lagi.";
+      }
+      
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  }, [email, password, rememberMe, navigate]);
+
+  const handleKeyPress = useCallback((e) => {
+    if (e.key === 'Enter' && !loading) {
+      handleSubmit(e);
+    }
+  }, [handleSubmit, loading]);
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div>
           <Link
-            to="/register" 
+            to="/register"
             className="inline-flex items-center text-gray-600 hover:text-gray-900 transition"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
@@ -136,10 +133,12 @@ const handleSubmit = async (e) => {
                   id="email"
                   type="email"
                   required
+                  autoComplete="email"
                   disabled={loading}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  onKeyPress={handleKeyPress}
+                  className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed transition-colors"
                   placeholder="nama@email.com"
                 />
               </div>
@@ -161,10 +160,12 @@ const handleSubmit = async (e) => {
                   id="password"
                   type={showPassword ? "text" : "password"}
                   required
+                  autoComplete="current-password"
                   disabled={loading}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="block w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  onKeyPress={handleKeyPress}
+                  className="block w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed transition-colors"
                   placeholder="••••••••"
                 />
 
@@ -173,6 +174,7 @@ const handleSubmit = async (e) => {
                   disabled={loading}
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute inset-y-0 right-0 pr-3 flex items-center disabled:cursor-not-allowed"
+                  tabIndex={-1}
                 >
                   {showPassword ? (
                     <EyeOff className="h-5 w-5 text-gray-400 hover:text-gray-600 transition" />
@@ -184,14 +186,14 @@ const handleSubmit = async (e) => {
             </div>
 
             <div className="flex items-center justify-between">
-              <label className="flex items-center">
+              <label className="flex items-center cursor-pointer">
                 <input
                   id="remember-me"
                   type="checkbox"
                   disabled={loading}
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
-                  className="h-4 w-4 text-blue-600 rounded border-gray-300"
+                  className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
                 />
                 <span className="ml-2 text-sm text-gray-700">Ingat saya</span>
               </label>
@@ -209,7 +211,7 @@ const handleSubmit = async (e) => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-gray-900 text-white py-3 px-4 rounded-lg font-semibold hover:bg-gray-800 focus:ring-2 transition duration-200 transform hover:scale-105 disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center gap-2"
+              className="w-full bg-gray-900 text-white py-3 px-4 rounded-lg font-semibold hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 transition duration-200 transform hover:scale-[1.02] disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center gap-2"
             >
               {loading ? (
                 <>
@@ -223,7 +225,7 @@ const handleSubmit = async (e) => {
           </form>
 
           <div className="mt-6 pt-6 border-t border-gray-200">
-            <p className="text-center text-gray-600">
+            <p className="text-center text-gray-600 text-sm">
               Belum punya akun?{" "}
               <Link
                 to="/register"
@@ -237,6 +239,8 @@ const handleSubmit = async (e) => {
       </div>
     </div>
   );
-}
+});
+
+Login.displayName = 'Login';
 
 export default Login;

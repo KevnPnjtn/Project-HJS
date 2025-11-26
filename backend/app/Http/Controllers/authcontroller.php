@@ -15,12 +15,10 @@ class AuthController extends Controller
 {
     public function register(Request $request)
     {
-        // Log request yang masuk
         Log::info('=== REGISTER REQUEST RECEIVED ===');
         Log::info('Request Data:', $request->all());
 
         try {
-            // Validasi
             $validated = $request->validate([
                 'username' => 'required|string|max:255|unique:users',
                 'email' => 'required|string|email|max:255|unique:users',
@@ -32,16 +30,12 @@ class AuthController extends Controller
             ]);
 
             Log::info('Validation passed:', $validated);
-
-            // Cek koneksi database
             Log::info('Database:', [
                 'connection' => DB::connection()->getDatabaseName(),
                 'driver' => DB::connection()->getDriverName()
             ]);
 
-            // Buat user dengan transaction
             DB::beginTransaction();
-            
             $user = User::create([
                 'username' => $validated['username'],
                 'email' => $validated['email'],
@@ -55,16 +49,12 @@ class AuthController extends Controller
                 'email' => $user->email
             ]);
 
-            // Commit transaction
             DB::commit();
-
-            // Trigger email verification
             try {
                 event(new Registered($user));
                 Log::info('Registered event fired for user: ' . $user->id);
             } catch (\Exception $emailError) {
                 Log::error('Email sending failed: ' . $emailError->getMessage());
-                // Lanjutkan meskipun email gagal
             }
 
             return response()->json([

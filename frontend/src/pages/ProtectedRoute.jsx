@@ -1,15 +1,10 @@
 import { Navigate } from "react-router-dom";
-import { getCurrentUser } from "../services/auth";
+import { getCurrentUser, isAuthenticated } from "../services/auth";
+import { memo } from "react";
 
-export default function ProtectedRoute({ children, role }) {
-  const token = localStorage.getItem("accessToken") || sessionStorage.getItem("accessToken");
-  const emailVerified = localStorage.getItem("emailVerified");
-
-  if (!token) {
+const ProtectedRoute = memo(({ children, role }) => {
+  if (!isAuthenticated()) {
     return <Navigate to="/login" replace />;
-  }
-  if (emailVerified !== "true") {
-    return <Navigate to="/email-verification-expired" replace />;
   }
 
   if (role) {
@@ -21,4 +16,8 @@ export default function ProtectedRoute({ children, role }) {
   }
 
   return children;
-}
+});
+
+ProtectedRoute.displayName = 'ProtectedRoute';
+
+export default ProtectedRoute;

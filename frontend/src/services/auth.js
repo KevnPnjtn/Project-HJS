@@ -4,6 +4,7 @@ export const register = (data) => api.post("/register", data);
 export const login = (data) => api.post("/login", data);
 export const verifyEmail = (token) => api.get(`/verify-email/${token}`);
 export const resendVerification = (email) => api.post("/email/resend", { email });
+
 export const logout = async () => {
   try {
     await api.post("/logout");
@@ -29,4 +30,10 @@ export const getCurrentUser = () => {
     }
   }
   return null;
+};
+
+export const isAuthenticated = () => {
+  const token = localStorage.getItem("accessToken") || sessionStorage.getItem("accessToken");
+  const emailVerified = localStorage.getItem("emailVerified") || sessionStorage.getItem("emailVerified");
+  return !!(token && emailVerified === "true");
 };

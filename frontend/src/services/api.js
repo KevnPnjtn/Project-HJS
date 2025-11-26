@@ -2,11 +2,12 @@ import axios from "axios";
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL,
+  timeout: 10000, 
   withCredentials: true,
   headers: {
     "Content-Type": "application/json",
     Accept: "application/json",
-    "X-Requested-With": "XMLHttpRequest", 
+    "X-Requested-With": "XMLHttpRequest",
   },
 });
 
@@ -18,9 +19,7 @@ api.interceptors.request.use(
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
 api.interceptors.response.use(
@@ -30,7 +29,6 @@ api.interceptors.response.use(
       localStorage.removeItem("accessToken");
       localStorage.removeItem("user");
       localStorage.removeItem("emailVerified");
-      
       sessionStorage.removeItem("accessToken");
       sessionStorage.removeItem("user");
       sessionStorage.removeItem("emailVerified");
