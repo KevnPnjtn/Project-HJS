@@ -3,10 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Package, Home, Archive, ClipboardList, Layers, 
   FileBarChart, FileText, LogOut, ChevronsLeft, ChevronsRight, 
-  User, X, Menu // Tambahkan icon Menu
+  User, X, Menu 
 } from 'lucide-react';
 
-// Import komponen halaman (pastikan path sesuai)
 import DashboardPageAdmin from '../DashboardPageAdmin';
 import ProductManagementAdmin from '../ProductManagementAdmin';
 import BarangMasukAdmin from '../BarangMasukAdmin';
@@ -16,16 +15,12 @@ import LaporanAdmin from '../LaporanAdmin';
 import KartuStokAdmin from '../KartuStokAdmin';
 
 const DashboardAdmin = () => {
-  // State untuk Desktop (Expanded/Collapsed)
   const [isDesktopSidebarOpen, setIsDesktopSidebarOpen] = useState(true);
-  // State untuk Mobile (Open/Close Drawer)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   const [activeMenu, setActiveMenu] = useState('dashboard');
   const [showConfirmModal, setShowConfirmModal] = useState(false); 
   const navigate = useNavigate();
-  
-  // Safe parsing user data
   const user = JSON.parse(localStorage.getItem('user') || sessionStorage.getItem('user') || '{}');
 
   const menuItems = [
@@ -37,8 +32,6 @@ const DashboardAdmin = () => {
     { id: 'laporan', label: 'Laporan', icon: FileBarChart },
     { id: 'kartu-stok', label: 'Kartu Stok', icon: FileText },
   ];
-
-  // Tutup sidebar mobile otomatis saat menu diklik (UX Mobile)
   const handleMenuClick = (id) => {
     setActiveMenu(id);
     setIsMobileMenuOpen(false);
@@ -48,12 +41,11 @@ const DashboardAdmin = () => {
 
   const handleConfirmLogout = () => {
     setShowConfirmModal(false); 
-    localStorage.clear(); // Hapus semua local/session storage sekaligus
+    localStorage.clear(); 
     sessionStorage.clear();
     navigate('/login');
   };
 
-  // Render halaman konten
   const renderActivePage = () => {
     const components = {
       'dashboard': <DashboardPageAdmin />,
