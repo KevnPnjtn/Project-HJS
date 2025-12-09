@@ -7,7 +7,10 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Validation\Rules\Password;
+use Illuminate\Validation\Rules\Password as PasswordRule;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Auth\Events\PasswordReset;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cookie;
@@ -298,4 +301,204 @@ class AuthController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Logout error'], 500);
         }
     }
+    
+    public function forgotPassword(Request $request)
+    {
+        Log::info('=== FORGOT PASSWORD REQUEST ===');
+        Log::info('Request Email:', ['email' => $request->email]);
+
+        try {
+            $request->merge([
+                'email' => strtolower(trim($request->email ?? '')),
+            ]);
+
+            Log::info('After processing:', ['email' => $request->email]);
+
+            $request->validate([
+                'email' => 'required|email',
+            ]);
+
+            // Manual check dengan case-insensitive
+            $user = User::whereRaw('LOWER(email) = ?', [strtolower($request->email)])->first();
+
+            if (!$user) {
+                Log::warning('✗ User not found with email:', ['email' => $request->email]);
+                
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Validasi gagal',
+                    'errors' => [
+                        'email' => ['Email tidak terdaftar dalam sistem.']
+                    ]
+                ], 422);
+            }
+
+            Log::info('✓ User found:', [
+                'user_id' => $user->user_id,
+                'email' => $user->email,
+                'email_verified_at' => $user->email_verified_at
+            ]);
+
+            // Cek apakah email sudah diverifikasi
+            if (!$user->hasVerifiedEmail()) {
+                Log::warning('✗ Password reset blocked: Email not verified', [
+                    'email' => $user->email
+                ]);
+                
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Silakan verifikasi email Anda terlebih dahulu sebelum reset password.',
+                ], 403);
+            }
+
+            Log::info('✓ Email is verified, attempting to send reset link');
+
+            try {
+                set_time_limit(15);
+                
+                // ✅ Kirim link reset password - gunakan Password facade
+                $status = Password::sendResetLink(
+                    ['email' => $user->email]
+                );
+
+                Log::info('Password::sendResetLink status:', ['status' => $status]);
+
+                if ($status === Password::RESET_LINK_SENT) {
+                    Log::info('✓ Password reset link sent successfully', [
+                        'email' => $user->email
+                    ]);
+
+                    return response()->json([
+                        'status' => 'success',
+                        'message' => 'Link reset password telah dikirim ke email Anda. Silakan cek inbox atau folder spam.',
+                    ], 200);
+                }
+
+                Log::error('✗ Password reset link not sent', [
+                    'status' => $status,
+                    'email' => $user->email
+                ]);
+
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Gagal mengirim email reset password. Silakan coba lagi.',
+                ], 500);
+
+            } catch (\Exception $mailError) {
+                Log::error('✗ Password reset email failed:', [
+                    'email' => $user->email,
+                    'error' => $mailError->getMessage(),
+                    'trace' => $mailError->getTraceAsString()
+                ]);
+                
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Gagal mengirim email reset password: ' . $mailError->getMessage(),
+                ], 500);
+            } finally {
+                set_time_limit(30);
+            }
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            Log::error('✗ Forgot password validation failed:', [
+                'errors' => $e->errors(),
+                'input' => $request->all()
+            ]);
+            
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Validasi gagal',
+                'errors' => $e->errors()
+            ], 422);
+            
+        } catch (\Exception $e) {
+            Log::error('✗ Forgot password error:', [
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+            
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function resetPassword(Request $request)
+    {
+        Log::info('=== RESET PASSWORD REQUEST ===');
+        
+        try {
+            $request->validate([
+                'token' => 'required',
+                'email' => 'required|email',
+                'password' => [
+                    'required',
+                    'confirmed',
+                    PasswordRule::min(8)->letters()->mixedCase()->numbers()  
+                ],
+            ]);
+
+            $status = Password::reset(
+                $request->only('email', 'password', 'password_confirmation', 'token'),
+                function (User $user, string $password) {
+                    $user->forceFill([
+                        'password' => Hash::make($password)
+                    ])->setRememberToken(Str::random(60));
+
+                    $user->save();
+
+                    event(new PasswordReset($user));
+
+                    Log::info('✓ Password reset successful', [
+                        'user_id' => $user->user_id,
+                        'email' => $user->email
+                    ]);
+                }
+            );
+
+            if ($status === Password::PASSWORD_RESET) {
+                return response()->json([
+                    'status' => 'success',
+                    'message' => 'Password berhasil direset. Silakan login dengan password baru Anda.',
+                ], 200);
+            }
+
+            $message = match($status) {
+                Password::INVALID_TOKEN => 'Token reset password tidak valid atau sudah kedaluwarsa.',
+                Password::INVALID_USER => 'Email tidak ditemukan.',
+                default => 'Gagal mereset password. Silakan coba lagi.',
+            };
+
+            Log::warning('✗ Password reset failed:', [
+                'status' => $status,
+                'email' => $request->email
+            ]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => $message,
+            ], 400);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            Log::error('✗ Reset password validation failed:', $e->errors());
+            
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Validasi gagal',
+                'errors' => $e->errors()
+            ], 422);
+            
+        } catch (\Exception $e) {
+            Log::error('✗ Reset password error:', [
+                'message' => $e->getMessage()
+            ]);
+            
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Terjadi kesalahan. Silakan coba lagi.'
+            ], 500);
+    }
+}
 }

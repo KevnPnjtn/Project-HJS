@@ -15,6 +15,9 @@ use App\Http\Controllers\ProductQrLogController;
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
+Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
+Route::post('/reset-password', [AuthController::class, 'resetPassword']);
+Route::post('/resend-verification', [AuthController::class, 'resendVerification']);
 
 Route::get('/email/verify/{id}/{hash}', function (Request $request, $id, $hash) {
     Log::info('=== EMAIL VERIFICATION ATTEMPT ===', [

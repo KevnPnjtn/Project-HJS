@@ -4,6 +4,8 @@ export const register = (data) => api.post("/register", data);
 export const login = (data) => api.post("/login", data);
 export const verifyEmail = (token) => api.get(`/verify-email/${token}`);
 export const resendVerification = (email) => api.post("/email/resend", { email });
+export const forgotPassword = (email) => api.post("/forgot-password", { email });
+export const resetPassword = (data) => api.post("/reset-password", data);
 
 export const logout = async () => {
   try {

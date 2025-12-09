@@ -1,21 +1,27 @@
 import React from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 
-import Login from "./pages//auth/Login";
-import DashboardAdmin from "./pages//admin/Layout/DashboardAdmin";
+import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
-import DashboardUser from "./pages/DashboardUser";
-import LandingPage from "./pages/LandingPage";
+import ForgotPassword from "./pages/auth/ForgotPassword";
+import ResetPassword from "./pages/auth/ResetPassword";
 import EmailVerificationExpired from "./pages/EmailVerification";
+import DashboardAdmin from "./pages/admin/Layout/DashboardAdmin";
+import DashboardUser from "./pages/DashboardUser";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 function App() {
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<LandingPage />} />
+        {/* Default route langsung ke login */}
+        <Route path="/" element={<Navigate to="/login" replace />} />
+        
+        {/* Auth routes */}
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/email-verification-expired" element={<EmailVerificationExpired />} />
         
         {/* Protected route untuk admin */}
@@ -39,7 +45,7 @@ function App() {
         />
         
         {/* Catch all route */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </Router>
   );
