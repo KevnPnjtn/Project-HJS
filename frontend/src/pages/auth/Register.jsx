@@ -1,37 +1,17 @@
 import React, { useState, useMemo, useCallback } from "react";
-import {
-  ArrowLeft,
-  Eye,
-  EyeOff,
-  Mail,
-  Lock,
-  User,
-  AlertCircle,
-  CheckCircle,
-} from "lucide-react";
-import { Link, useNavigate } from "react-router-dom"; 
+import { Link, useNavigate } from "react-router-dom";
+import { ArrowLeft, Eye, EyeOff, Mail, Lock, User, AlertCircle, CheckCircle, ShieldCheck, Loader } from "lucide-react";
 import { register } from "../../services/auth";
 
-const PasswordInputWithValidation = React.memo(({
-  id,
-  label,
-  value,
-  onChange,
-  disabled,
-  show,
-  toggleShow,
-  isValid,
-}) => (
+// Komponen Input Password Reusable
+const PasswordInput = React.memo(({ id, label, value, onChange, disabled, show, toggleShow, isValid, placeholder }) => (
   <div>
-    <label
-      htmlFor={id}
-      className="block text-sm font-semibold text-gray-700 mb-2"
-    >
+    <label htmlFor={id} className="block text-sm font-semibold text-gray-700 mb-2">
       {label} <span className="text-red-500">*</span>
     </label>
-    <div className="relative">
-      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-        <Lock className="h-5 w-5 text-gray-400" />
+    <div className="relative group">
+      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+        <Lock className="h-5 w-5 text-gray-400 group-focus-within:text-blue-600 transition-colors" />
       </div>
       <input
         id={id}
@@ -41,22 +21,19 @@ const PasswordInputWithValidation = React.memo(({
         value={value}
         onChange={onChange}
         disabled={disabled}
-        className={`block w-full pl-10 ${
-          isValid ? "pr-20" : "pr-12"
-        } py-3 border rounded-lg focus:ring-2 transition disabled:bg-gray-100 disabled:cursor-not-allowed ${
+        // FIX: [&::-ms-reveal]:hidden untuk menyembunyikan ikon mata ganda di Edge
+        className={`block w-full pl-12 ${isValid ? "pr-12" : "pr-12"} py-3.5 border rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 transition-all [&::-ms-reveal]:hidden [&::-ms-clear]:hidden ${
           isValid
-            ? "border-green-400 focus:ring-green-500"
-            : value.length > 0
-            ? "border-red-400 focus:ring-red-500"
-            : "border-gray-300 focus:ring-blue-500"
+            ? "border-green-500 focus:ring-green-500/20 focus:border-green-500"
+            : value.length > 0 && !isValid
+            ? "border-red-300 focus:ring-red-500/20 focus:border-red-500 bg-red-50/30"
+            : "border-gray-200 focus:ring-blue-100 focus:border-blue-600"
         }`}
-        placeholder={
-          id === "password" ? "Minimal 8 karakter" : "Ulangi password"
-        }
+        placeholder={placeholder}
       />
-      <div className="absolute inset-y-0 right-0 flex items-center">
+      <div className="absolute inset-y-0 right-0 flex items-center pr-4">
         {isValid && (
-          <div className="pr-2 flex items-center pointer-events-none">
+          <div className="mr-2 flex items-center pointer-events-none animate-fade-in">
             <CheckCircle className="h-5 w-5 text-green-500" />
           </div>
         )}
@@ -64,20 +41,16 @@ const PasswordInputWithValidation = React.memo(({
           type="button"
           onClick={toggleShow}
           disabled={disabled}
-          className="pr-3 flex items-center disabled:cursor-not-allowed hover:opacity-70 transition"
+          className="text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
         >
-          {show ? (
-            <EyeOff className="h-5 w-5 text-gray-400 hover:text-gray-600" />
-          ) : (
-            <Eye className="h-5 w-5 text-gray-400 hover:text-gray-600" />
-          )}
+          {show ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
         </button>
       </div>
     </div>
   </div>
 ));
 
-const Register = () => { 
+const Register = () => {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -87,7 +60,7 @@ const Register = () => {
   const [successCountdown, setSuccessCountdown] = useState(0);
 
   const [formData, setFormData] = useState({
-    username: "", 
+    username: "",
     email: "",
     password: "",
     confirmPassword: "",
@@ -107,39 +80,20 @@ const Register = () => {
   const isEmailValid = useMemo(() => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim()), [formData.email]);
   const isPasswordValid = useMemo(() => {
     const pwd = formData.password;
-    return pwd.length >= 8 && 
-           /[a-z]/.test(pwd) && 
-           /[A-Z]/.test(pwd) && 
-           /[0-9]/.test(pwd);
+    return pwd.length >= 8 && /[a-z]/.test(pwd) && /[A-Z]/.test(pwd) && /[0-9]/.test(pwd);
   }, [formData.password]);
   
   const isConfirmPasswordValid = useMemo(() => 
-    formData.password.length >= 8 && 
-    formData.password === formData.confirmPassword,
+    formData.password.length >= 8 && formData.password === formData.confirmPassword,
     [formData.password, formData.confirmPassword]
   );
 
   const validateForm = () => {
-    if (!isUsernameValid) {
-      setError("Username wajib diisi dan minimal 3 karakter.");
-      return false;
-    }
-    if (!isEmailValid) {
-      setError("Format email tidak valid.");
-      return false;
-    }
-    if (!isPasswordValid) {
-      setError("Password minimal 8 karakter, harus mengandung huruf besar, huruf kecil, dan angka.");
-      return false;
-    }
-    if (!isConfirmPasswordValid) {
-      setError("Password dan konfirmasi password tidak sama.");
-      return false;
-    }
-    if (!formData.terms) {
-      setError("Anda harus menyetujui Syarat & Ketentuan.");
-      return false;
-    }
+    if (!isUsernameValid) { setError("Username minimal 3 karakter."); return false; }
+    if (!isEmailValid) { setError("Format email tidak valid."); return false; }
+    if (!isPasswordValid) { setError("Password kurang kuat (Wajib: 8+ karakter, Huruf Besar, Kecil, & Angka)."); return false; }
+    if (!isConfirmPasswordValid) { setError("Konfirmasi password tidak cocok."); return false; }
+    if (!formData.terms) { setError("Anda harus menyetujui Syarat & Ketentuan."); return false; }
     return true;
   };
 
@@ -148,33 +102,23 @@ const Register = () => {
     setError("");
     setSuccess(false);
 
-    if (!validateForm()) {
-      return;
-    }
+    if (!validateForm()) return;
 
     setLoading(true);
 
     try {
       const registerData = {
-        username: formData.username.trim(), 
+        username: formData.username.trim(),
         email: formData.email.trim(),
         password: formData.password,
-        password_confirmation: formData.confirmPassword, 
+        password_confirmation: formData.confirmPassword,
       };
 
-      const response = await register(registerData);
-
-      console.log("Respon sukses:", response.data);
+      await register(registerData);
       
       setSuccess(true);
-      setSuccessCountdown(3); 
-      setFormData({ 
-        username: "", 
-        email: "", 
-        password: "", 
-        confirmPassword: "", 
-        terms: false 
-      });
+      setSuccessCountdown(3);
+      setFormData({ username: "", email: "", password: "", confirmPassword: "", terms: false });
 
       const interval = setInterval(() => {
         setSuccessCountdown((prev) => {
@@ -188,24 +132,14 @@ const Register = () => {
 
     } catch (err) {
       console.error("Error registrasi:", err);
+      let apiErrorMessage = "Registrasi gagal.";
       
-      let apiErrorMessage = "Registrasi gagal. Silakan coba lagi.";
-      
-      if (err.response) {
-        console.error("Data Error:", err.response.data);
-        
-        if (err.response.data?.errors) {
-          const errors = err.response.data.errors;
-          apiErrorMessage = Object.values(errors).flat().join("; ");
-        } else if (err.response.data?.message) {
-          apiErrorMessage = err.response.data.message;
-        }
+      if (err.response?.data?.errors) {
+        apiErrorMessage = Object.values(err.response.data.errors).flat().join("; ");
+      } else if (err.response?.data?.message) {
+        apiErrorMessage = err.response.data.message;
       } else if (err.request) {
-        console.error("Request Error:", err.request);
-        apiErrorMessage = "Tidak dapat terhubung ke server. Pastikan server Laravel berjalan.";
-      } else {
-        console.error("Error:", err.message);
-        apiErrorMessage = err.message;
+        apiErrorMessage = "Tidak dapat terhubung ke server.";
       }
       
       setError(apiErrorMessage);
@@ -215,82 +149,74 @@ const Register = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center px-4 sm:px-6 lg:px-8 py-12">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">
+      
       {/* Modal Sukses */}
       {success && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4">
-          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center animate-scale-in">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 px-4 animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full text-center transform transition-all scale-100">
             <div className="flex justify-center mb-6">
-              <div className="relative w-24 h-24">
-                <div className="absolute inset-0 bg-green-100 rounded-full animate-pulse"></div>
-                <div className="relative flex items-center justify-center h-24">
-                  <CheckCircle className="w-20 h-20 text-green-500 animate-bounce" />
+              <div className="bg-green-50 p-4 rounded-full">
+                <div className="bg-green-100 p-3 rounded-full">
+                  <ShieldCheck className="w-12 h-12 text-green-600" />
                 </div>
               </div>
             </div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-2">
-              Registrasi Berhasil!
-            </h3>
-            <p className="text-gray-600 mb-6">
-              Akun Anda telah berhasil dibuat. Silakan cek email untuk verifikasi. Mengalihkan ke halaman login...
+            <h3 className="text-2xl font-bold text-gray-900 mb-2">Akun Dibuat!</h3>
+            <p className="text-gray-600 mb-6 text-sm">
+              Registrasi berhasil. Silakan cek email Anda untuk verifikasi akun sebelum login.
             </p>
-            {successCountdown > 0 && (
-              <div className="mb-6">
-                <div className="flex items-center justify-center gap-2">
-                  <p className="text-sm text-gray-700">
-                    Mengalihkan dalam
-                  </p>
-                  <span className="inline-flex items-center justify-center w-8 h-8 bg-blue-500 text-white rounded-full font-bold text-lg">
-                    {successCountdown}
-                  </span>
-                </div>
-              </div>
-            )}
+            <div className="mb-6 flex items-center justify-center gap-2 text-sm font-medium text-gray-500">
+              <span>Mengalihkan otomatis dalam</span>
+              <span className="bg-blue-100 text-blue-700 w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold">
+                {successCountdown}
+              </span>
+            </div>
             <button
               onClick={() => navigate('/login')}
-              className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-blue-700 transition duration-200"
+              className="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold hover:bg-blue-700 transition-all"
             >
-              Lanjut ke Login
+              Login Sekarang
             </button>
           </div>
         </div>
       )}
 
-      {/* Konten Utama */}
-      <div className="max-w-md w-full space-y-8">
-        <Link to="/login" className="flex items-center text-gray-600 hover:text-gray-900 transition mb-4">
-          <ArrowLeft className="w-5 h-5 mr-2" /> Kembali ke Login
-        </Link>
+      {/* Main Card */}
+      <div className="max-w-md w-full">
         
-        <div className="bg-white rounded-2xl shadow-lg p-8 border border-gray-100">
+        <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
+          
+          {/* Navigasi Back di DALAM card */}
+          <div className="mb-6">
+            <Link to="/login" className="inline-flex items-center gap-2 text-gray-500 hover:text-gray-900 transition-colors group">
+                <ArrowLeft className="w-6 h-6 group-hover:-translate-x-1 transition-transform" /> 
+            </Link>
+          </div>
+
           <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold text-gray-900 mb-2">
-              Daftar Akun Baru
-            </h2>
-            <p className="text-gray-600">
-              Isi data Anda untuk membuat akun.
+            <h2 className="text-2xl font-bold text-gray-900">Buat Akun Baru</h2>
+            <p className="text-gray-500 text-sm mt-2">
+              Lengkapi data berikut untuk mendaftar
             </p>
           </div>
 
           {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start animate-slide-down">
-              <AlertCircle className="w-5 h-5 text-red-600 mr-3 mt-0.5 flex-shrink-0" />
-              <p className="text-sm text-red-800">{error}</p>
+            <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 rounded-r-lg flex items-start gap-3 animate-fade-in-up">
+              <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+              <p className="text-sm text-red-700 font-medium">{error}</p>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-5">
             {/* Username */}
             <div>
-              <label
-                htmlFor="username"
-                className="block text-sm font-semibold text-gray-700 mb-2"
-              >
+              <label htmlFor="username" className="block text-sm font-semibold text-gray-700 mb-2">
                 Username <span className="text-red-500">*</span>
               </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <User className="h-5 w-5 text-gray-400" />
+              <div className="relative group">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <User className="h-5 w-5 text-gray-400 group-focus-within:text-blue-600 transition-colors" />
                 </div>
                 <input
                   id="username"
@@ -301,38 +227,30 @@ const Register = () => {
                   onChange={handleChange}
                   disabled={loading}
                   placeholder="Minimal 3 karakter"
-                  className={`block w-full pl-10 pr-10 py-3 border rounded-lg focus:ring-2 focus:outline-none transition disabled:bg-gray-100 disabled:cursor-not-allowed ${
+                  className={`block w-full pl-12 pr-12 py-3 border rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 transition-all ${
                     isUsernameValid
-                      ? "border-green-400 focus:ring-green-500"
+                      ? "border-green-500 focus:ring-green-500/20 focus:border-green-500"
                       : formData.username.length > 0
-                      ? "border-red-400 focus:ring-red-500"
-                      : "border-gray-300 focus:ring-blue-500"
+                      ? "border-red-300 focus:ring-red-500/20 focus:border-red-500 bg-red-50/30"
+                      : "border-gray-200 focus:ring-blue-100 focus:border-blue-600"
                   }`}
                 />
                 {isUsernameValid && (
-                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                  <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none animate-fade-in">
                     <CheckCircle className="h-5 w-5 text-green-500" />
                   </div>
                 )}
               </div>
-              {formData.username.length > 0 && !isUsernameValid && (
-                <p className="text-xs text-red-500 mt-1">
-                  Username harus minimal 3 karakter
-                </p>
-              )}
             </div>
 
             {/* Email */}
             <div>
-              <label
-                htmlFor="email"
-                className="block text-sm font-semibold text-gray-700 mb-2"
-              >
-                Email <span className="text-red-500">*</span>
+              <label htmlFor="email" className="block text-sm font-semibold text-gray-700 mb-2">
+                Email Address <span className="text-red-500">*</span>
               </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-gray-400" />
+              <div className="relative group">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <Mail className="h-5 w-5 text-gray-400 group-focus-within:text-blue-600 transition-colors" />
                 </div>
                 <input
                   id="email"
@@ -343,29 +261,24 @@ const Register = () => {
                   onChange={handleChange}
                   disabled={loading}
                   placeholder="nama@email.com"
-                  className={`block w-full pl-10 pr-10 py-3 border rounded-lg focus:ring-2 focus:outline-none transition disabled:bg-gray-100 disabled:cursor-not-allowed ${
+                  className={`block w-full pl-12 pr-12 py-3 border rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 transition-all ${
                     isEmailValid
-                      ? "border-green-400 focus:ring-green-500"
+                      ? "border-green-500 focus:ring-green-500/20 focus:border-green-500"
                       : formData.email.length > 0
-                      ? "border-red-400 focus:ring-red-500"
-                      : "border-gray-300 focus:ring-blue-500"
+                      ? "border-red-300 focus:ring-red-500/20 focus:border-red-500 bg-red-50/30"
+                      : "border-gray-200 focus:ring-blue-100 focus:border-blue-600"
                   }`}
                 />
                 {isEmailValid && (
-                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                  <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none animate-fade-in">
                     <CheckCircle className="h-5 w-5 text-green-500" />
                   </div>
                 )}
               </div>
-              {formData.email.length > 0 && !isEmailValid && (
-                <p className="text-xs text-red-500 mt-1">
-                  Format email tidak valid.
-                </p>
-              )}
             </div>
 
             {/* Password */}
-            <PasswordInputWithValidation
+            <PasswordInput
               id="password"
               label="Password"
               value={formData.password}
@@ -374,15 +287,11 @@ const Register = () => {
               show={showPassword}
               toggleShow={() => setShowPassword(!showPassword)}
               isValid={isPasswordValid}
+              placeholder="Min. 8 karakter dengan huruf besar, kecil & angka"
             />
-            {formData.password.length > 0 && !isPasswordValid && (
-              <p className="text-xs text-red-500 -mt-4">
-                Password minimal 8 karakter (huruf besar, kecil, dan angka)
-              </p>
-            )}
 
-            {/* Konfirmasi Password */}
-            <PasswordInputWithValidation
+            {/* Confirm Password */}
+            <PasswordInput
               id="confirmPassword"
               label="Konfirmasi Password"
               value={formData.confirmPassword}
@@ -391,68 +300,62 @@ const Register = () => {
               show={showConfirmPassword}
               toggleShow={() => setShowConfirmPassword(!showConfirmPassword)}
               isValid={isConfirmPasswordValid}
+              placeholder="Ulangi password"
             />
 
             {/* Terms */}
-            <div className="flex items-start">
-              <input
-                id="terms"
-                name="terms"
-                type="checkbox"
-                checked={formData.terms}
-                onChange={handleChange}
-                disabled={loading}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded mt-1 disabled:cursor-not-allowed"
-              />
-              <label
-                htmlFor="terms"
-                className="ml-2 block text-sm text-gray-700"
-              >
-                Saya menyetujui{" "}
-                <a href="#" className="text-blue-600 hover:underline">
-                  Syarat & Ketentuan
-                </a>
-                <span className="text-red-500"> *</span>
-              </label>
-            </div>
-            
-            <div className="pt-2">
-              <p className="text-sm text-center text-gray-600 mb-4">
-                Sudah punya akun? 
-                <Link 
-                  to="/login"
-                  className="text-blue-600 font-semibold hover:underline ml-1"
-                >
-                  Masuk di sini
-                </Link>
-              </p>
+            <div className="flex items-start pt-2">
+              <div className="flex h-5 items-center">
+                <input
+                  id="terms"
+                  name="terms"
+                  type="checkbox"
+                  checked={formData.terms}
+                  onChange={handleChange}
+                  disabled={loading}
+                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                />
+              </div>
+              <div className="ml-3 text-sm">
+                <label htmlFor="terms" className="text-gray-600 cursor-pointer select-none">
+                  Saya menyetujui <span className="font-semibold text-blue-600 hover:underline">Syarat & Ketentuan</span> serta <span className="font-semibold text-blue-600 hover:underline">Kebijakan Privasi</span>
+                </label>
+              </div>
             </div>
 
             {/* Tombol Submit */}
             <button
               type="submit"
               disabled={loading || !formData.terms}
-              className="w-full bg-gray-900 text-white py-3 px-4 rounded-lg font-semibold hover:bg-gray-800 transition duration-200 transform hover:scale-105 disabled:bg-gray-400 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center"
+              className="w-full bg-blue-600 text-white py-3.5 rounded-xl font-bold text-base hover:bg-blue-700 active:scale-[0.98] transition-all shadow-lg shadow-blue-600/20 disabled:opacity-70 disabled:cursor-not-allowed disabled:shadow-none mt-6"
             >
               {loading ? (
                 <>
-                  <svg
-                    className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Mendaftar...
+                  <Loader className="w-5 h-5 animate-spin" />
+                  <span>Mendaftarkan...</span>
                 </>
               ) : (
-                "Daftar Sekarang"
+                "Buat Akun Baru"
               )}
             </button>
           </form>
+
+          <div className="mt-8 pt-6 border-t border-gray-100 text-center">
+            <p className="text-sm text-gray-500">
+              Sudah punya akun?{" "}
+              <Link
+                to="/login"
+                className="text-blue-600 font-bold hover:text-blue-700 hover:underline transition-colors"
+              >
+                Masuk di sini
+              </Link>
+            </p>
+          </div>
         </div>
+        
+        <p className="text-center text-sm text-gray-400 mt-8">
+          &copy; {new Date().getFullYear()} Inventory System.
+        </p>
       </div>
     </div>
   );

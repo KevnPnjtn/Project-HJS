@@ -318,7 +318,6 @@ class AuthController extends Controller
                 'email' => 'required|email',
             ]);
 
-            // Manual check dengan case-insensitive
             $user = User::whereRaw('LOWER(email) = ?', [strtolower($request->email)])->first();
 
             if (!$user) {
@@ -339,7 +338,6 @@ class AuthController extends Controller
                 'email_verified_at' => $user->email_verified_at
             ]);
 
-            // Cek apakah email sudah diverifikasi
             if (!$user->hasVerifiedEmail()) {
                 Log::warning('✗ Password reset blocked: Email not verified', [
                     'email' => $user->email
@@ -356,7 +354,6 @@ class AuthController extends Controller
             try {
                 set_time_limit(15);
                 
-                // ✅ Kirim link reset password - gunakan Password facade
                 $status = Password::sendResetLink(
                     ['email' => $user->email]
                 );
@@ -439,6 +436,20 @@ class AuthController extends Controller
                     PasswordRule::min(8)->letters()->mixedCase()->numbers()  
                 ],
             ]);
+
+             if (Hash::check($request->password, $user->password)) {
+                Log::warning('✗ Password sama dengan password lama', [
+                    'email' => $request->email
+                ]);
+
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Password baru tidak boleh sama dengan password lama.',
+                    'errors' => [
+                        'password' => ['Password baru tidak boleh sama dengan password lama.']
+                    ]
+                ], 422);
+            }
 
             $status = Password::reset(
                 $request->only('email', 'password', 'password_confirmation', 'token'),
