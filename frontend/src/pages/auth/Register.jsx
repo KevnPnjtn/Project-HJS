@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, Eye, EyeOff, Mail, Lock, User, AlertCircle, CheckCircle, ShieldCheck, Loader } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, Mail, Lock, User, AlertCircle, CheckCircle, ShieldCheck, Loader2 } from "lucide-react";
 import { register } from "../../services/auth";
 
 // Komponen Input Password Reusable
@@ -21,7 +21,6 @@ const PasswordInput = React.memo(({ id, label, value, onChange, disabled, show, 
         value={value}
         onChange={onChange}
         disabled={disabled}
-        // FIX: [&::-ms-reveal]:hidden untuk menyembunyikan ikon mata ganda di Edge
         className={`block w-full pl-12 ${isValid ? "pr-12" : "pr-12"} py-3.5 border rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 transition-all [&::-ms-reveal]:hidden [&::-ms-clear]:hidden ${
           isValid
             ? "border-green-500 focus:ring-green-500/20 focus:border-green-500"
@@ -41,7 +40,8 @@ const PasswordInput = React.memo(({ id, label, value, onChange, disabled, show, 
           type="button"
           onClick={toggleShow}
           disabled={disabled}
-          className="text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+          className="text-gray-400 hover:text-gray-600 transition-colors cursor-pointer disabled:opacity-50"
+          aria-label={show ? "Sembunyikan password" : "Tampilkan password"}
         >
           {show ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
         </button>
@@ -313,7 +313,7 @@ const Register = () => {
                   checked={formData.terms}
                   onChange={handleChange}
                   disabled={loading}
-                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 />
               </div>
               <div className="ml-3 text-sm">
@@ -323,16 +323,16 @@ const Register = () => {
               </div>
             </div>
 
-            {/* Tombol Submit */}
+            {/* ✅ TOMBOL SUBMIT - FIXED SIZE & IMPROVED UX */}
             <button
               type="submit"
               disabled={loading || !formData.terms}
-              className="w-full bg-blue-600 text-white py-3.5 rounded-xl font-bold text-base hover:bg-blue-700 active:scale-[0.98] transition-all shadow-lg shadow-blue-600/20 disabled:opacity-70 disabled:cursor-not-allowed disabled:shadow-none mt-6"
+              className="w-full bg-blue-600 text-white py-3.5 rounded-xl font-bold text-base hover:bg-blue-700 active:scale-[0.98] transition-all shadow-lg shadow-blue-600/20 disabled:opacity-70 disabled:cursor-not-allowed disabled:shadow-none disabled:active:scale-100 mt-6 flex items-center justify-center gap-2 min-h-[52px]"
             >
               {loading ? (
                 <>
-                  <Loader className="w-5 h-5 animate-spin" />
-                  <span>Mendaftarkan...</span>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span>Memproses...</span>
                 </>
               ) : (
                 "Buat Akun Baru"

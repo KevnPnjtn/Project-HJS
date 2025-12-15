@@ -14,18 +14,26 @@ const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('accessToken') || sessionStorage.getItem('accessToken');
+    
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    
+    console.log('🔑 [API] Request with token:', token ? 'Yes' : 'No');
     return config;
   },
-  (error) => Promise.reject(error)
+  (error) => {
+    console.error('❌ [API] Request error:', error);
+    return Promise.reject(error);
+  }
 );
 
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
+      console.warn('🚫 [API] Unauthorized - Clearing auth data');
+      
       localStorage.removeItem("accessToken");
       localStorage.removeItem("user");
       localStorage.removeItem("emailVerified");
@@ -34,9 +42,10 @@ api.interceptors.response.use(
       sessionStorage.removeItem("emailVerified");
       
       if (!window.location.pathname.includes('/login')) {
-          window.location.href = "/login";
+        window.location.href = "/login";
+      }
     }
-    }
+    
     return Promise.reject(error);
   } 
 );

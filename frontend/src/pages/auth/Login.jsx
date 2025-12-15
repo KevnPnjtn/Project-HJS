@@ -1,6 +1,6 @@
 import React, { useState, useCallback, memo } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Eye, EyeOff, Mail, Lock, Loader, AlertCircle } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
 import { login } from "../../services/auth";
 
 const Login = memo(() => {
@@ -28,8 +28,11 @@ const Login = memo(() => {
       setLoading(true);
       const res = await login({ email, password });
       
-      const { user } = res.data;
+      const { user, access_token } = res.data;
+      
+      // ✅ SIMPAN TOKEN & USER DATA
       const storage = rememberMe ? localStorage : sessionStorage;
+      storage.setItem("accessToken", access_token); // ✅ SIMPAN TOKEN
       storage.setItem("user", JSON.stringify(user));
       
       const isVerified = user.email_verified_at ? "true" : "false";
@@ -37,6 +40,7 @@ const Login = memo(() => {
 
       if (!user.email_verified_at) {
         setError("Akun belum terverifikasi. Silakan cek email Anda.");
+        storage.removeItem("accessToken");
         storage.removeItem("user");
         storage.removeItem("emailVerified");
         return;
@@ -93,8 +97,8 @@ const Login = memo(() => {
           )}
 
           {success && (
-            <div className="mb-6 p-4 bg-green-50 border-l-4 border-green-500 rounded-r-lg flex items-center gap-2 justify-center">
-              <Loader className="w-4 h-4 text-green-600 animate-spin" />
+            <div className="mb-6 p-4 bg-green-50 border-l-4 border-green-500 rounded-r-lg flex items-center gap-3">
+              <CheckCircle2 className="w-5 h-5 text-green-600" />
               <p className="text-sm text-green-700 font-medium">{success}</p>
             </div>
           )}
@@ -102,7 +106,7 @@ const Login = memo(() => {
           <form className="space-y-5" onSubmit={handleSubmit}>
             {/* Email Field */}
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5 ml-1">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Email
               </label>
               <div className="relative group">
@@ -115,7 +119,7 @@ const Login = memo(() => {
                   disabled={loading}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="block w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-600 transition-all"
+                  className="block w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-600 transition-all disabled:opacity-70"
                   placeholder="nama@email.com"
                 />
               </div>
@@ -123,7 +127,7 @@ const Login = memo(() => {
 
             {/* Password Field */}
             <div>
-              <div className="flex items-center justify-between mb-1.5 ml-1">
+              <div className="flex items-center justify-between mb-2">
                 <label className="block text-sm font-semibold text-gray-700">
                   Password
                 </label>
@@ -138,15 +142,15 @@ const Login = memo(() => {
                   disabled={loading}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  // FIX: [&::-ms-reveal]:hidden untuk menyembunyikan ikon mata ganda di Edge
-                  className="block w-full pl-12 pr-12 py-3 border border-gray-200 rounded-xl bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-600 transition-all [&::-ms-reveal]:hidden [&::-ms-clear]:hidden"
+                  className="block w-full pl-12 pr-12 py-3 border border-gray-200 rounded-xl bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-600 transition-all [&::-ms-reveal]:hidden [&::-ms-clear]:hidden disabled:opacity-70"
                   placeholder="••••••••"
                 />
                 <button
                   type="button"
                   disabled={loading}
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                  className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600 transition-colors cursor-pointer disabled:opacity-50"
+                  aria-label={showPassword ? "Sembunyikan password" : "Tampilkan password"}
                 >
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
@@ -161,7 +165,7 @@ const Login = memo(() => {
                   disabled={loading}
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
-                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 transition cursor-pointer"
+                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 />
                 <span className="ml-2 text-sm text-gray-600 group-hover:text-gray-900 transition-colors font-medium">Ingat saya</span>
               </label>
@@ -174,17 +178,17 @@ const Login = memo(() => {
               </Link>
             </div>
 
-            {/* Submit Button */}
+            {/* ✅ SUBMIT BUTTON - FIXED SIZE & IMPROVED UX */}
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-blue-600 text-white py-3.5 rounded-xl font-bold text-base hover:bg-blue-700 active:scale-[0.98] transition-all shadow-lg shadow-blue-600/20 disabled:opacity-70 disabled:cursor-not-allowed disabled:shadow-none"
+              className="w-full bg-blue-600 text-white py-3.5 rounded-xl font-bold text-base hover:bg-blue-700 active:scale-[0.98] transition-all shadow-lg shadow-blue-600/20 disabled:opacity-70 disabled:cursor-not-allowed disabled:shadow-none disabled:active:scale-100 flex items-center justify-center gap-2 min-h-[52px]"
             >
               {loading ? (
-                <div className="flex items-center justify-center gap-2">
-                  <Loader className="w-5 h-5 animate-spin" />
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
                   <span>Masuk...</span>
-                </div>
+                </>
               ) : (
                 "Masuk"
               )}
