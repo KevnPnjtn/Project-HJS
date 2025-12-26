@@ -27,14 +27,11 @@ const Login = memo(() => {
     try {
       setLoading(true);
       const res = await login({ email, password });
-      
       const { user, access_token } = res.data;
-      
-      // ✅ SIMPAN TOKEN & USER DATA
       const storage = rememberMe ? localStorage : sessionStorage;
-      storage.setItem("accessToken", access_token); // ✅ SIMPAN TOKEN
+      storage.setItem("accessToken", access_token); 
       storage.setItem("user", JSON.stringify(user));
-      
+    
       const isVerified = user.email_verified_at ? "true" : "false";
       storage.setItem("emailVerified", isVerified);
 

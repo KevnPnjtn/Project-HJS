@@ -8,7 +8,7 @@ import ResetPassword from "./pages/auth/ResetPassword";
 import EmailVerification from "./pages/auth/EmailVerification";
 import VerifyEmail from "./pages/auth/VerifyEmail";
 import DashboardAdmin from "./pages/admin/Layout/DashboardAdmin";
-import DashboardUser from "./pages/DashboardUser";
+import DashboardUser from "./pages/user/Layout/DashboardUser"; 
 import ProtectedRoute from "./components/ProtectedRoute";
 
 function App() {
