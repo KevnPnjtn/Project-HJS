@@ -148,7 +148,6 @@ const BarangKeluarAdmin = () => {
     setSearchProduct(product.nama_barang);
     setShowDropdown(false);
     setSuccess(`✓ Produk dipilih: ${product.nama_barang}`);
-    setTimeout(() => setSuccess(''), 2000);
   };
 
   const handleSimpan = async () => {

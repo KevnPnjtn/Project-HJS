@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Save, RotateCcw, ClipboardCheck, AlertCircle, Download, CheckCircle, XCircle, ChevronDown, X, PackageMinus, QrCode } from 'lucide-react';
+import { Search, Save, RotateCcw, ClipboardCheck, AlertCircle, Download, CheckCircle, XCircle, ChevronDown, X, PackageMinus } from 'lucide-react';
 import { productapi } from '../../services/productapi';
 import { stockopnameapi } from '../../services/stockopnameapi';
 import * as XLSX from 'xlsx';
@@ -130,7 +130,6 @@ const StokOpnameAdmin = () => {
     setSearchProduct(product.nama_barang);
     setShowDropdown(false);
     setSuccess(`Produk dipilih: ${product.nama_barang}`);
-    setTimeout(() => setSuccess(''), 2000);
   };
 
   const handleClearSelection = () => {

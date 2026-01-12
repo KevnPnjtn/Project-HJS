@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Edit2, Trash2, X, Package, Download, CheckCircle2, AlertCircle, QrCode, Printer } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, X, Package, Download, AlertCircle, QrCode, Printer } from 'lucide-react';
 import { productapi } from '../../services/productapi';
 import * as XLSX from 'xlsx';
 import QRCodeLib from 'qrcode';
@@ -16,7 +16,6 @@ const ProductManagementAdmin = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
 
   const [pagination, setPagination] = useState({
     currentPage: 1,
@@ -98,13 +97,8 @@ const ProductManagementAdmin = () => {
       XLSX.utils.book_append_sheet(wb, ws, "Data Produk");
       const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
       XLSX.writeFile(wb, `Data_Produk_${timestamp}.xlsx`);
-      
-      setSuccess('✓ Data berhasil di-export!');
-      setTimeout(() => setSuccess(''), 3000);
     } catch (error) {
       console.error('Export error:', error);
-      setError('Gagal export data');
-      setTimeout(() => setError(''), 3000);
     }
   };
 
@@ -133,7 +127,6 @@ const ProductManagementAdmin = () => {
       }));
     } catch (error) {
       console.error('Fetch products error:', error);
-      setError('Gagal memuat data produk');
     } finally {
       setLoading(false);
     }
@@ -142,7 +135,6 @@ const ProductManagementAdmin = () => {
   const handleOpenModal = (mode, product = null) => {
     setModalMode(mode);
     setError('');
-    setSuccess('');
 
     if (mode === 'edit' && product) {
       setSelectedProduct(product);
@@ -173,7 +165,6 @@ const ProductManagementAdmin = () => {
     setShowModal(false);
     setSelectedProduct(null);
     setError('');
-    setSuccess('');
   };
 
   const handleInputChange = (e) => {
@@ -183,34 +174,41 @@ const ProductManagementAdmin = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    setSuccess('');
 
     try {
       const user = JSON.parse(localStorage.getItem('user') || sessionStorage.getItem('user') || '{}');
       
       const dataToSubmit = {
-        ...formData,
-        user_id: user.user_id || null, 
-        stok_minimal: formData.stok_minimal || 0, 
-        stok: formData.stok || 0, 
+        kode_barang: formData.kode_barang.trim(),
+        nama_barang: formData.nama_barang.trim(),
+        jenis_barang: formData.jenis_barang || null,
+        satuan: formData.satuan,
+        stok_minimal: formData.stok_minimal ? parseInt(formData.stok_minimal) : 0,
+        harga_modal: parseFloat(formData.harga_modal) || 0,
+        harga_jual: parseFloat(formData.harga_jual) || 0,
+        user_id: user.user_id || null
       };
+
+      if (!dataToSubmit.kode_barang || !dataToSubmit.nama_barang || !dataToSubmit.satuan) {
+        setError('Mohon lengkapi semua field yang wajib diisi');
+        return;
+      }
 
       if (modalMode === 'add') {
         await productapi.create(dataToSubmit);
-        setSuccess('✓ Produk berhasil ditambahkan!');
       } else {
         await productapi.update(selectedProduct.product_id, dataToSubmit);
-        setSuccess('✓ Produk berhasil diupdate!');
       }
       
-      setTimeout(() => {
-        setPagination(prev => ({ ...prev, currentPage: 1 }));
-        fetchProducts();
-        handleCloseModal();
-      }, 1500);
+      handleCloseModal();
+      setPagination(prev => ({ ...prev, currentPage: 1 }));
+      fetchProducts();
     } catch (error) {
       console.error('Submit error:', error);
-      setError(error.response?.data?.message || 'Gagal menyimpan produk');
+      const errorMsg = error.response?.data?.message || 
+                       error.response?.data?.error || 
+                       'Gagal menyimpan produk. Periksa kembali data yang diinput.';
+      setError(errorMsg);
     }
   };
 
@@ -218,12 +216,10 @@ const ProductManagementAdmin = () => {
     if (window.confirm('Apakah Anda yakin ingin menghapus produk ini?')) {
       try {
         await productapi.delete(productId);
-        setSuccess('✓ Produk berhasil dihapus!');
         fetchProducts();
-        setTimeout(() => setSuccess(''), 3000);
       } catch (error) {
         console.error('Delete error:', error);
-        setError('Gagal menghapus produk');
+        alert('Gagal menghapus produk');
       }
     }
   };
@@ -245,7 +241,6 @@ const ProductManagementAdmin = () => {
       setQrCodeDataURL(dataURL);
     } catch (error) {
       console.error('QR generation error:', error);
-      setError('Gagal generate QR Code');
     }
   };
 
@@ -258,9 +253,6 @@ const ProductManagementAdmin = () => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    
-    setSuccess('✓ QR Code berhasil didownload!');
-    setTimeout(() => setSuccess(''), 3000);
   };
 
   const handlePrintQR = () => {
@@ -333,9 +325,8 @@ const ProductManagementAdmin = () => {
   });
 
   return (
-    <div className="space-y-6">
-      {/* Header Section */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+    <div className="min-h-screen bg-gray-50">
+      <div className="bg-white shadow-sm border-b border-gray-200 p-6">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
@@ -363,21 +354,6 @@ const ProductManagementAdmin = () => {
           </div>
         </div>
 
-        {/* Success/Error Messages */}
-        {success && (
-          <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg text-green-700 flex items-center gap-3 animate-pulse">
-            <CheckCircle2 className="w-5 h-5" />
-            {success}
-          </div>
-        )}
-        {error && (
-          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 flex items-center gap-3">
-            <AlertCircle className="w-5 h-5" />
-            {error}
-          </div>
-        )}
-
-        {/* Filters */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -401,8 +377,7 @@ const ProductManagementAdmin = () => {
         </div>
       </div>
 
-      {/* Table Section */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      <div className="bg-white shadow-sm border border-gray-200 mt-0 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-indigo-600 text-white">
@@ -499,7 +474,6 @@ const ProductManagementAdmin = () => {
           </table>
         </div>
 
-        {/* Pagination */}
         {!loading && filteredProducts.length > 0 && (
           <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
             <div className="flex items-center justify-between">
@@ -561,36 +535,42 @@ const ProductManagementAdmin = () => {
         )}
       </div>
 
-      {/* Modal QR Code */}
       {showQRModal && selectedQRProduct && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md animate-in zoom-in duration-300">
-            <div className="bg-gradient-to-r from-purple-600 to-purple-800 text-white px-6 py-4 rounded-t-xl flex items-center justify-between">
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ backgroundColor: 'rgba(0, 0, 0, 0.75)' }}
+          onClick={() => setShowQRModal(false)}
+        >
+          <div 
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-md"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="bg-gradient-to-r from-purple-600 to-purple-800 text-white px-6 py-4 rounded-t-2xl flex items-center justify-between">
               <h3 className="text-xl font-bold flex items-center gap-2">
                 <QrCode className="w-6 h-6" />
                 QR Code Produk
               </h3>
               <button
                 onClick={() => setShowQRModal(false)}
-                className="p-2 hover:bg-white/20 rounded-lg transition-all"
+                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-6 text-center space-y-4">
-              <div className="bg-gray-50 p-6 rounded-xl border-2 border-purple-200">
+            <div className="p-6 space-y-4">
+              <div className="bg-gray-50 p-6 rounded-xl border-2 border-purple-200 flex items-center justify-center">
                 {qrCodeDataURL && (
                   <img 
                     src={qrCodeDataURL} 
                     alt="QR Code" 
-                    className="w-64 h-64 mx-auto"
+                    className="w-64 h-64"
                   />
                 )}
               </div>
 
-              <div className="text-left bg-gradient-to-r from-purple-50 to-purple-100 p-4 rounded-lg border border-purple-200">
-                <h4 className="font-bold text-purple-900 mb-2">{selectedQRProduct.nama_barang}</h4>
+              <div className="bg-gradient-to-r from-purple-50 to-purple-100 p-4 rounded-xl border border-purple-200">
+                <h4 className="font-bold text-purple-900 mb-2 text-lg">{selectedQRProduct.nama_barang}</h4>
                 <div className="space-y-1 text-sm text-purple-700">
                   <p><strong>Kode:</strong> {selectedQRProduct.kode_barang}</p>
                   <p><strong>Jenis:</strong> {selectedQRProduct.jenis_barang || '-'}</p>
@@ -599,17 +579,17 @@ const ProductManagementAdmin = () => {
                 </div>
               </div>
 
-              <div className="flex gap-3">
+              <div className="flex gap-3 pt-2">
                 <button
                   onClick={handleDownloadQR}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all font-semibold shadow-md"
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors font-semibold shadow-lg hover:shadow-xl"
                 >
                   <Download className="w-5 h-5" />
                   Download PNG
                 </button>
                 <button
                   onClick={handlePrintQR}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all font-semibold shadow-md"
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold shadow-lg hover:shadow-xl"
                 >
                   <Printer className="w-5 h-5" />
                   Print
@@ -620,25 +600,50 @@ const ProductManagementAdmin = () => {
         </div>
       )}
 
-      {/* Modal Add/Edit */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-in zoom-in duration-300">
-            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between rounded-t-xl">
-              <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                <Plus className="w-6 h-6 text-indigo-600" />
-                {modalMode === 'add' ? 'Tambah Produk Baru' : 'Edit Produk'}
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ backgroundColor: 'rgba(0, 0, 0, 0.75)' }}
+          onClick={handleCloseModal}
+        >
+          <div 
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="sticky top-0 bg-gradient-to-r from-indigo-600 to-indigo-800 text-white px-6 py-4 flex items-center justify-between rounded-t-2xl z-10">
+              <h3 className="text-xl font-bold flex items-center gap-2">
+                {modalMode === 'add' ? (
+                  <>
+                    <Plus className="w-6 h-6" />
+                    Tambah Produk Baru
+                  </>
+                ) : (
+                  <>
+                    <Edit2 className="w-6 h-6" />
+                    Edit Produk
+                  </>
+                )}
               </h3>
               <button
                 onClick={handleCloseModal}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-all"
+                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <form onSubmit={handleSubmit} className="p-6 space-y-5">
-              <div className="grid grid-cols-2 gap-5">
+              {error && (
+                <div className="p-4 bg-red-50 border-l-4 border-red-500 rounded-lg text-red-700 flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-semibold">Terjadi Kesalahan</p>
+                    <p className="text-sm mt-1">{error}</p>
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Kode Barang <span className="text-red-500">*</span>
@@ -649,8 +654,8 @@ const ProductManagementAdmin = () => {
                     value={formData.kode_barang}
                     onChange={handleInputChange}
                     required
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
-                    placeholder="Masukkan kode barang"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                    placeholder="Contoh: BR-001"
                   />
                 </div>
 
