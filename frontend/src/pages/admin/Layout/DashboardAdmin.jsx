@@ -3,7 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Package, Home, Archive, ClipboardList, Layers, 
   FileBarChart, FileText, LogOut, ChevronsLeft, ChevronsRight, 
-  User, X, Menu 
+  User, X, Menu, 
+  Notebook,
+  NotebookPen
 } from 'lucide-react';
 
 import DashboardPageAdmin from '../DashboardPageAdmin';
@@ -31,6 +33,7 @@ const DashboardAdmin = () => {
     { id: 'stok-opname', label: 'Stok Opname', icon: Layers },
     { id: 'laporan-Opname', label: 'Laporan Opname', icon: FileBarChart },
     { id: 'kartu-stok', label: 'Kartu Stok', icon: FileText },
+    { id: 'laporan-profit', label: 'Laporan Profit', icon: NotebookPen },
   ];
   const handleMenuClick = (id) => {
     setActiveMenu(id);
@@ -53,7 +56,9 @@ const DashboardAdmin = () => {
       'barang-keluar': <BarangKeluarAdmin />,
       'stok-opname': <StokOpnameAdmin />,
       'laporan-Opname': <LaporanOpnameAdmin />,
-      'kartu-stok': <KartuStokAdmin />
+      'kartu-stok': <KartuStokAdmin />,
+
+
     };
     return components[activeMenu] || <DashboardPageAdmin />;
   };

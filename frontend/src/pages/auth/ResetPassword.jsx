@@ -20,8 +20,7 @@ const ResetPassword = () => {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
   const [validationErrors, setValidationErrors] = useState({});
-
-  // ✅ Debug: Log URL parameters
+ 
   useEffect(() => {
     console.log('=== Reset Password Component Mounted ===');
     const token = searchParams.get('token');

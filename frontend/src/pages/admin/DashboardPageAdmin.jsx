@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Package, Archive, ShoppingCart, AlertTriangle, TrendingUp, Calendar, ArrowUpCircle, ArrowDownCircle, BarChart3 } from 'lucide-react';
+import { Package, Archive, ShoppingCart, AlertTriangle, TrendingUp, ArrowUpCircle, ArrowDownCircle, BarChart3 } from 'lucide-react';
 import { productapi } from '../../services/productapi';
 import { stockapi } from '../../services/stockapi';
 
@@ -8,7 +8,10 @@ const DashboardPageAdmin = () => {
     totalProducts: 0,
     totalStockIn: 0,
     totalStockOut: 0,
-    lowStockProducts: 0
+    lowStockProducts: 0,
+    totalModal: 0,
+    totalPenjualan: 0,
+    profit: 0
   });
   const [recentTransactions, setRecentTransactions] = useState([]);
   const [lowStockItems, setLowStockItems] = useState([]);
@@ -29,43 +32,82 @@ const DashboardPageAdmin = () => {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-       
-      // Ambil semua produk dengan per_page yang besar
+      
       const [productsResponse, stockSummary, transactionsResponse] = await Promise.all([
-        productapi.getAll({ per_page: 1000 }), // Ambil SEMUA produk
+        productapi.getAll({ per_page: 1000 }),
         stockapi.getSummary(),
-        stockapi.getAll({ per_page: 1000 }) // Ambil SEMUA transaksi
+        stockapi.getAll({ per_page: 1000 })
       ]);
  
       const productsData = productsResponse.data || productsResponse;
       const products = productsData.data || [];
       
-      // Debug: Lihat berapa produk yang dikembalikan
-      console.log('Total products from API:', productsData.total);
-      console.log('Products array length:', products.length);
-      console.log('Products data:', products);
+      console.clear();
+      console.log('%c=== DASHBOARD CALCULATION ===', 'color: blue; font-size: 16px; font-weight: bold');
+      console.log('📦 Products:', products.length);
       
-      // Gunakan total dari response API atau hitung dari array
       const totalProducts = productsData.total || products.length;
+      const lowStock = products.filter(p => p.stok_minimal && p.stok <= p.stok_minimal);
        
-      const lowStock = products.filter(p => 
-        p.stok_minimal && p.stok <= p.stok_minimal
-      );
+      const totalModal = products.reduce((sum, p) => {
+        const modal = parseFloat(p.harga_modal) || 0;
+        const stok = parseInt(p.stok) || 0;
+        return sum + (modal * stok);
+      }, 0);
+       
+      const allTransactions = transactionsResponse.data?.data || [];
+      const outTransactions = allTransactions.filter(t => t.jenis_transaksi === 'OUT');
+      
+      console.log('📤 OUT Transactions:', outTransactions.length);
+       
+      let totalPenjualan = 0;
+      let modalKeluar = 0;
+      
+      outTransactions.forEach((t, i) => {
+        const product = products.find(p => p.product_id === t.product_id);
+        
+        if (product) {
+          const hargaJual = parseFloat(product.harga_jual) || 0;
+          const hargaModal = parseFloat(product.harga_modal) || 0;
+          const jumlah = parseInt(t.jumlah) || 0;
+          
+          if (i === 0) {
+            console.log('First match:', {
+              product: product.nama_barang,
+              harga_jual: hargaJual,
+              harga_modal: hargaModal,
+              jumlah: jumlah
+            });
+          }
+          
+          totalPenjualan += (hargaJual * jumlah);
+          modalKeluar += (hargaModal * jumlah);
+        }
+      });
+      
+      const profit = totalPenjualan - modalKeluar;
+      
+      console.log('%c💰 RESULTS:', 'color: green; font-weight: bold');
+      console.log('Modal Inventory:', totalModal);
+      console.log('Total Penjualan:', totalPenjualan);
+      console.log('Modal Keluar:', modalKeluar);
+      console.log('PROFIT:', profit);
        
       setStats({
-        totalProducts: totalProducts,
+        totalProducts,
         totalStockIn: stockSummary.data?.total_in || 0,
         totalStockOut: stockSummary.data?.total_out || 0,
-        lowStockProducts: lowStock.length
+        lowStockProducts: lowStock.length,
+        totalModal,
+        totalPenjualan,
+        profit
       });
       
       setLowStockItems(lowStock.slice(0, 5));
-       
-      const allTransactions = transactionsResponse.data?.data || [];
       setRecentTransactions(allTransactions);
       
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
+      console.error('Error:', error);
     } finally {
       setLoading(false);
     }
@@ -73,7 +115,6 @@ const DashboardPageAdmin = () => {
  
   useEffect(() => {
     const { start, end } = getDateRange(period);
-    
     let filtered = recentTransactions;
     
     if (start && end) {
@@ -98,21 +139,15 @@ const DashboardPageAdmin = () => {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     
-    if (periodType === 'today') {
-      return { start: today, end: now };
-    }
-    
+    if (periodType === 'today') return { start: today, end: now };
     if (periodType === 'week') {
       const weekStart = new Date(today);
       weekStart.setDate(today.getDate() - today.getDay());
       return { start: weekStart, end: now };
     }
-    
     if (periodType === 'month') {
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-      return { start: monthStart, end: now };
+      return { start: new Date(now.getFullYear(), now.getMonth(), 1), end: now };
     }
-    
     return { start: null, end: null };
   };
 
@@ -132,32 +167,31 @@ const DashboardPageAdmin = () => {
     <button
       onClick={() => setPeriod(value)}
       className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
-        period === value
-          ? 'bg-indigo-600 text-white shadow-md'
-          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+        period === value ? 'bg-indigo-600 text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
       }`}
     >
       {label}
     </button>
   );
 
+  const formatCurrency = (amount) => {
+    if (!amount || isNaN(amount)) return 'Rp0';
+    return new Intl.NumberFormat('id-ID', {
+      style: 'currency',
+      currency: 'IDR',
+      minimumFractionDigits: 0
+    }).format(amount);
+  };
+
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('id-ID', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+      day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
     });
   };
 
   const getPeriodLabel = () => {
-    switch (period) {
-      case 'today': return 'Harian';
-      case 'week': return 'Mingguan';
-      case 'month': return 'Bulanan';
-      default: return 'Semua Waktu';
-    }
+    const labels = { today: 'Harian', week: 'Mingguan', month: 'Bulanan' };
+    return labels[period] || 'Semua Waktu';
   };
  
   const maxValue = Math.max(filteredStats.totalIn, filteredStats.totalOut, 1);
@@ -185,36 +219,89 @@ const DashboardPageAdmin = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard
-          title="Total Produk"
-          value={stats.totalProducts}
-          icon={Package}
-          iconColor="bg-indigo-600"
-          bgColor="bg-white"
-        />
-        <StatCard
-          title="Total Barang Masuk"
-          value={stats.totalStockIn}
-          icon={Archive}
-          iconColor="bg-blue-500"
-          bgColor="bg-white"
-        />
-        <StatCard
-          title="Total Barang Keluar"
-          value={stats.totalStockOut}
-          icon={ShoppingCart}
-          iconColor="bg-green-500"
-          bgColor="bg-white"
-        />
-        <StatCard
-          title="Stok Menipis"
-          value={stats.lowStockProducts}
-          icon={AlertTriangle}
-          iconColor="bg-red-500"
-          bgColor="bg-white"
-        />
+        <StatCard title="Jenis Produk" value={stats.totalProducts} icon={Package} iconColor="bg-indigo-600" bgColor="bg-white" />
+        <StatCard title="Total Barang Masuk" value={stats.totalStockIn} icon={Archive} iconColor="bg-blue-500" bgColor="bg-white" />
+        <StatCard title="Total Barang Keluar" value={stats.totalStockOut} icon={ShoppingCart} iconColor="bg-green-500" bgColor="bg-white" />
+        <StatCard title="Stok Menipis" value={stats.lowStockProducts} icon={AlertTriangle} iconColor="bg-red-500" bgColor="bg-white" />
       </div>
 
+      {/* Profit Section */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-green-100 rounded-lg">
+              <TrendingUp className="w-6 h-6 text-green-600" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">Analisis Profit</h3>
+              <p className="text-sm text-gray-500">Ringkasan modal, penjualan, dan keuntungan</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 border border-blue-200">
+              <div className="p-3 bg-blue-500 rounded-xl shadow-lg w-fit mb-3">
+                <Package className="w-6 h-6 text-white" />
+              </div>
+              <p className="text-sm text-blue-600 font-medium mb-1">Total Modal Inventory</p>
+              <p className="text-2xl font-bold text-blue-900">{formatCurrency(stats.totalModal)}</p>
+              <p className="text-xs text-blue-500 mt-1">Nilai semua produk di gudang</p>
+            </div>
+
+            <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-6 border border-purple-200">
+              <div className="p-3 bg-purple-500 rounded-xl shadow-lg w-fit mb-3">
+                <ShoppingCart className="w-6 h-6 text-white" />
+              </div>
+              <p className="text-sm text-purple-600 font-medium mb-1">Total Penjualan</p>
+              <p className="text-2xl font-bold text-purple-900">{formatCurrency(stats.totalPenjualan)}</p>
+              <p className="text-xs text-purple-500 mt-1">Dari {stats.totalStockOut} unit terjual</p>
+            </div>
+
+            <div className={`bg-gradient-to-br rounded-xl p-6 border ${
+              stats.profit >= 0 ? 'from-green-50 to-green-100 border-green-200' : 'from-red-50 to-red-100 border-red-200'
+            }`}>
+              <div className={`p-3 rounded-xl shadow-lg w-fit mb-3 ${stats.profit >= 0 ? 'bg-green-500' : 'bg-red-500'}`}>
+                <TrendingUp className="w-6 h-6 text-white" />
+              </div>
+              <p className={`text-sm font-medium mb-1 ${stats.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>Profit Bersih</p>
+              <p className={`text-2xl font-bold ${stats.profit >= 0 ? 'text-green-900' : 'text-red-900'}`}>{formatCurrency(stats.profit)}</p>
+              <p className={`text-xs mt-1 ${stats.profit >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                {stats.profit >= 0 ? 'Keuntungan' : 'Kerugian'} dari penjualan
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">💰 Penjualan (Revenue)</span>
+                <span className="font-semibold text-gray-900">{formatCurrency(stats.totalPenjualan)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">📦 Modal Produk Terjual (COGS)</span>
+                <span className="font-semibold text-gray-900">- {formatCurrency(stats.totalPenjualan - stats.profit)}</span>
+              </div>
+              <div className="border-t border-gray-300 pt-3 flex items-center justify-between">
+                <span className="text-base font-bold text-gray-900">📈 Profit Margin</span>
+                <div className="text-right">
+                  <span className={`text-lg font-bold ${stats.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {formatCurrency(stats.profit)}
+                  </span>
+                  {stats.totalPenjualan > 0 && (
+                    <p className="text-xs text-gray-500">
+                      ({((stats.profit / stats.totalPenjualan) * 100).toFixed(1)}% margin)
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Stock Summary */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200">
         <div className="px-6 py-4 border-b border-gray-200">
           <div className="flex flex-wrap items-center justify-between gap-4">
@@ -255,10 +342,7 @@ const DashboardPageAdmin = () => {
                 </div>
               </div>
               <div className="h-3 bg-blue-200 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-blue-500 rounded-full transition-all duration-500"
-                  style={{ width: `${inPercent}%` }}
-                />
+                <div className="h-full bg-blue-500 rounded-full transition-all duration-500" style={{ width: `${inPercent}%` }} />
               </div>
             </div>
 
@@ -279,24 +363,19 @@ const DashboardPageAdmin = () => {
                 </div>
               </div>
               <div className="h-3 bg-red-200 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-red-500 rounded-full transition-all duration-500"
-                  style={{ width: `${outPercent}%` }}
-                />
+                <div className="h-full bg-red-500 rounded-full transition-all duration-500" style={{ width: `${outPercent}%` }} />
               </div>
             </div>
           </div>
 
-          <div className="mt-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <TrendingUp className={`w-6 h-6 ${filteredStats.totalIn - filteredStats.totalOut >= 0 ? 'text-green-500' : 'text-red-500'}`} />
-                <span className="text-gray-600 font-medium">Perubahan Stok Bersih ({getPeriodLabel()})</span>
-              </div>
-              <span className={`text-2xl font-bold ${filteredStats.totalIn - filteredStats.totalOut >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {filteredStats.totalIn - filteredStats.totalOut >= 0 ? '+' : ''}{filteredStats.totalIn - filteredStats.totalOut}
-              </span>
+          <div className="mt-6 p-4 bg-gray-50 rounded-xl border border-gray-200 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <TrendingUp className={`w-6 h-6 ${filteredStats.totalIn - filteredStats.totalOut >= 0 ? 'text-green-500' : 'text-red-500'}`} />
+              <span className="text-gray-600 font-medium">Perubahan Stok Bersih ({getPeriodLabel()})</span>
             </div>
+            <span className={`text-2xl font-bold ${filteredStats.totalIn - filteredStats.totalOut >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              {filteredStats.totalIn - filteredStats.totalOut >= 0 ? '+' : ''}{filteredStats.totalIn - filteredStats.totalOut}
+            </span>
           </div>
         </div>
       </div>
@@ -316,33 +395,17 @@ const DashboardPageAdmin = () => {
             ) : (
               <div className="space-y-3">
                 {recentTransactions.slice(0, 10).map((transaction, index) => (
-                  <div 
-                    key={transaction.transaction_id || index} 
-                    className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
-                  >
+                  <div key={transaction.transaction_id || index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                     <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-lg ${
-                        transaction.jenis_transaksi === 'IN' 
-                          ? 'bg-blue-100 text-blue-600' 
-                          : 'bg-red-100 text-red-600'
-                      }`}>
-                        {transaction.jenis_transaksi === 'IN' ? 
-                          <Archive className="w-5 h-5" /> : 
-                          <ShoppingCart className="w-5 h-5" />
-                        }
+                      <div className={`p-2 rounded-lg ${transaction.jenis_transaksi === 'IN' ? 'bg-blue-100 text-blue-600' : 'bg-red-100 text-red-600'}`}>
+                        {transaction.jenis_transaksi === 'IN' ? <Archive className="w-5 h-5" /> : <ShoppingCart className="w-5 h-5" />}
                       </div>
                       <div>
-                        <p className="font-semibold text-gray-900 text-sm">
-                          {transaction.product?.nama_barang || 'Produk'}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {formatDate(transaction.created_at)}
-                        </p>
+                        <p className="font-semibold text-gray-900 text-sm">{transaction.product?.nama_barang || 'Produk'}</p>
+                        <p className="text-xs text-gray-500">{formatDate(transaction.created_at)}</p>
                       </div>
                     </div>
-                    <span className={`font-bold text-sm ${
-                      transaction.jenis_transaksi === 'IN' ? 'text-blue-600' : 'text-red-600'
-                    }`}>
+                    <span className={`font-bold text-sm ${transaction.jenis_transaksi === 'IN' ? 'text-blue-600' : 'text-red-600'}`}>
                       {transaction.jenis_transaksi === 'IN' ? '+' : '-'}{transaction.jumlah}
                     </span>
                   </div>
@@ -370,18 +433,13 @@ const DashboardPageAdmin = () => {
             ) : (
               <div className="space-y-3">
                 {lowStockItems.map((item) => (
-                  <div 
-                    key={item.product_id} 
-                    className="flex items-center justify-between p-4 bg-red-50 rounded-lg border border-red-100 hover:bg-red-100 transition-colors"
-                  >
+                  <div key={item.product_id} className="flex items-center justify-between p-4 bg-red-50 rounded-lg border border-red-100 hover:bg-red-100 transition-colors">
                     <div>
                       <p className="font-semibold text-gray-900 text-sm">{item.nama_barang}</p>
                       <p className="text-xs text-gray-600">{item.kode_barang}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm text-gray-600">
-                        Stok: <span className="font-bold text-red-600">{item.stok}</span>
-                      </p>
+                      <p className="text-sm text-gray-600">Stok: <span className="font-bold text-red-600">{item.stok}</span></p>
                       <p className="text-xs text-gray-500">Min: {item.stok_minimal}</p>
                     </div>
                   </div>

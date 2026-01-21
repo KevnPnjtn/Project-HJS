@@ -298,7 +298,6 @@ class AuthController extends Controller
                 ], 403);
             }
 
-            // ✅ KIRIM TANPA BLOCKING
             try {
                 $status = PasswordFacade::sendResetLink(['email' => $user->email]);
                 Log::info('✓ Password reset link dispatched', ['email' => $user->email]);
@@ -308,8 +307,6 @@ class AuthController extends Controller
                     'error' => $mailError->getMessage()
                 ]);
             }
-
-            // Response cepat
             return response()->json([
                 'status' => 'success',
                 'message' => 'Link reset password telah dikirim ke email Anda.',

@@ -9,11 +9,7 @@ use Illuminate\Support\Facades\Log;
 
 class VerifyEmailController extends Controller
 {
-    /**
-     * Handle email verification request
-     * 
-     * URL Format: /api/email/verify/{id}/{hash}?expires=xxx&signature=xxx
-     */
+ 
     public function verify(Request $request, $id, $hash)
     {
         Log::info('=== EMAIL VERIFICATION REQUEST ===', [
@@ -35,7 +31,6 @@ class VerifyEmailController extends Controller
                 ], 404);
             }
 
-            // 2. Check if hash matches
             $expectedHash = sha1($user->getEmailForVerification());
             
             if (!hash_equals((string) $hash, $expectedHash)) {
@@ -51,7 +46,6 @@ class VerifyEmailController extends Controller
                 ], 400);
             }
 
-            // 3. Check if signature is valid (URL expiration check)
             if (!$request->hasValidSignature()) {
                 Log::warning('✗ Invalid or expired signature', ['user_id' => $id]);
                 
@@ -62,7 +56,6 @@ class VerifyEmailController extends Controller
                 ], 400);
             }
 
-            // 4. Check if already verified
             if ($user->hasVerifiedEmail()) {
                 Log::info('ℹ Email already verified', [
                     'user_id' => $id,
@@ -82,7 +75,6 @@ class VerifyEmailController extends Controller
                 ], 200);
             }
 
-            // 5. Mark email as verified
             if ($user->markEmailAsVerified()) {
                 event(new Verified($user));
                 
@@ -130,9 +122,7 @@ class VerifyEmailController extends Controller
         }
     }
 
-    /**
-     * Resend verification email
-     */
+ 
     public function resend(Request $request)
     {
         Log::info('=== RESEND VERIFICATION REQUEST ===', [

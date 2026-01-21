@@ -2,8 +2,7 @@ import React, { useState, useMemo, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, Eye, EyeOff, Mail, Lock, User, AlertCircle, CheckCircle, ShieldCheck, Loader2 } from "lucide-react";
 import { register } from "../../services/auth";
-
-// Komponen Input Password Reusable
+ 
 const PasswordInput = React.memo(({ id, label, value, onChange, disabled, show, toggleShow, isValid, placeholder }) => (
   <div>
     <label htmlFor={id} className="block text-sm font-semibold text-gray-700 mb-2">

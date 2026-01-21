@@ -25,8 +25,7 @@ class ProductQrLog extends Model
         'created_at' => 'datetime',
         'updated_at' => 'datetime'
     ];
-
-    // Relasi ke Product
+ 
     public function product()
     {
         return $this->belongsTo(Product::class, 'product_id', 'product_id');

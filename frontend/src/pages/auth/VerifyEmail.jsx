@@ -8,14 +8,13 @@ const VerifyEmailPage = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   
-  const [status, setStatus] = useState('verifying'); // verifying | success | error
+  const [status, setStatus] = useState('verifying'); 
   const [message, setMessage] = useState('Memverifikasi email Anda...');
   const [countdown, setCountdown] = useState(5);
 
   useEffect(() => {
     const verifyEmail = async () => {
       try {
-        // Get all query params (expires, signature, hash)
         const expires = searchParams.get('expires');
         const signature = searchParams.get('signature');
         const hash = searchParams.get('hash');
@@ -25,8 +24,6 @@ const VerifyEmailPage = () => {
           setMessage('Link verifikasi tidak valid atau tidak lengkap.');
           return;
         }
-
-        // Call verification endpoint
         const response = await api.get(`/email/verify/${id}/${hash}`, {
           params: { expires, signature }
         });
@@ -35,7 +32,6 @@ const VerifyEmailPage = () => {
           setStatus('success');
           setMessage(response.data.message || 'Email berhasil diverifikasi!');
           
-          // Start countdown
           const interval = setInterval(() => {
             setCountdown(prev => {
               if (prev <= 1) {
