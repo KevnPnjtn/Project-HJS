@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Package, Archive, ShoppingCart, AlertTriangle, TrendingUp, ArrowUpCircle, ArrowDownCircle, BarChart3 } from 'lucide-react';
+import { Package, Archive, ShoppingCart, AlertTriangle, TrendingUp, ArrowUpCircle, ArrowDownCircle, BarChart3, Boxes } from 'lucide-react';
 import { productapi } from '../../services/productapi';
 import { stockapi } from '../../services/stockapi';
 
@@ -42,10 +42,6 @@ const DashboardPageAdmin = () => {
       const productsData = productsResponse.data || productsResponse;
       const products = productsData.data || [];
       
-      console.clear();
-      console.log('%c=== DASHBOARD CALCULATION ===', 'color: blue; font-size: 16px; font-weight: bold');
-      console.log('📦 Products:', products.length);
-      
       const totalProducts = productsData.total || products.length;
       const lowStock = products.filter(p => p.stok_minimal && p.stok <= p.stok_minimal);
        
@@ -57,13 +53,11 @@ const DashboardPageAdmin = () => {
        
       const allTransactions = transactionsResponse.data?.data || [];
       const outTransactions = allTransactions.filter(t => t.jenis_transaksi === 'OUT');
-      
-      console.log('📤 OUT Transactions:', outTransactions.length);
        
       let totalPenjualan = 0;
       let modalKeluar = 0;
       
-      outTransactions.forEach((t, i) => {
+      outTransactions.forEach((t) => {
         const product = products.find(p => p.product_id === t.product_id);
         
         if (product) {
@@ -71,27 +65,12 @@ const DashboardPageAdmin = () => {
           const hargaModal = parseFloat(product.harga_modal) || 0;
           const jumlah = parseInt(t.jumlah) || 0;
           
-          if (i === 0) {
-            console.log('First match:', {
-              product: product.nama_barang,
-              harga_jual: hargaJual,
-              harga_modal: hargaModal,
-              jumlah: jumlah
-            });
-          }
-          
           totalPenjualan += (hargaJual * jumlah);
           modalKeluar += (hargaModal * jumlah);
         }
       });
       
       const profit = totalPenjualan - modalKeluar;
-      
-      console.log('%c💰 RESULTS:', 'color: green; font-weight: bold');
-      console.log('Modal Inventory:', totalModal);
-      console.log('Total Penjualan:', totalPenjualan);
-      console.log('Modal Keluar:', modalKeluar);
-      console.log('PROFIT:', profit);
        
       setStats({
         totalProducts,
@@ -198,6 +177,9 @@ const DashboardPageAdmin = () => {
   const inPercent = (filteredStats.totalIn / maxValue) * 100;
   const outPercent = (filteredStats.totalOut / maxValue) * 100;
 
+  // Hitung total stok tersedia
+  const totalStokTersedia = stats.totalStockIn - stats.totalStockOut;
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -215,6 +197,30 @@ const DashboardPageAdmin = () => {
             <p className="text-indigo-100">Pantau dan kelola inventory Anda secara real-time</p>
           </div>
           <TrendingUp className="w-16 h-16 opacity-20" />
+        </div>
+      </div>
+
+      {/* Card Total Stok Tersedia - BARU */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-indigo-50 rounded-lg">
+              <Boxes className="w-8 h-8 text-indigo-600" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-500 font-medium mb-1">Total Stok Tersedia</p>
+              <h2 className="text-3xl font-bold text-gray-900">{totalStokTersedia.toLocaleString('id-ID')}</h2>
+              <p className="text-xs text-gray-400 mt-1">
+                {stats.totalStockIn.toLocaleString('id-ID')} masuk - {stats.totalStockOut.toLocaleString('id-ID')} keluar
+              </p>
+            </div>
+          </div>
+          <div className="text-right bg-gray-50 rounded-lg px-4 py-3">
+            <p className="text-xs text-gray-500 mb-1">Persentase Tersisa</p>
+            <p className="text-2xl font-bold text-indigo-600">
+              {stats.totalStockIn > 0 ? ((totalStokTersedia / stats.totalStockIn) * 100).toFixed(1) : '0'}%
+            </p>
+          </div>
         </div>
       </div>
 
