@@ -15,6 +15,7 @@ import BarangKeluarAdmin from '../BarangKeluarAdmin';
 import StokOpnameAdmin from '../StokOpnameAdmin';
 import LaporanOpnameAdmin from '../LaporanOpnameAdmin';
 import KartuStokAdmin from '../KartuStokAdmin';
+import LaporanProfitAdmin from '../LaporanProfitAdmin';
 
 const DashboardAdmin = () => {
   const [isDesktopSidebarOpen, setIsDesktopSidebarOpen] = useState(true);
@@ -32,8 +33,8 @@ const DashboardAdmin = () => {
     { id: 'barang-keluar', label: 'Barang Keluar', icon: ClipboardList },
     { id: 'stok-opname', label: 'Stok Opname', icon: Layers },
     { id: 'laporan-Opname', label: 'Laporan Opname', icon: FileBarChart },
-    { id: 'kartu-stok', label: 'Kartu Stok', icon: FileText },
     { id: 'laporan-profit', label: 'Laporan Profit', icon: NotebookPen },
+    { id: 'kartu-stok', label: 'Kartu Stok', icon: FileText },
   ];
   const handleMenuClick = (id) => {
     setActiveMenu(id);
@@ -56,8 +57,8 @@ const DashboardAdmin = () => {
       'barang-keluar': <BarangKeluarAdmin />,
       'stok-opname': <StokOpnameAdmin />,
       'laporan-Opname': <LaporanOpnameAdmin />,
+      'laporan-profit': <LaporanProfitAdmin />,
       'kartu-stok': <KartuStokAdmin />,
-
 
     };
     return components[activeMenu] || <DashboardPageAdmin />;
