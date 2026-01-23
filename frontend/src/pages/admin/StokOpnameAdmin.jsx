@@ -242,84 +242,84 @@ const StokOpnameAdmin = () => {
   };
 
   const handleExport = () => {
-  try {
-    const exportData = filteredOpnames.map((opname, index) => ({
-      'No': index + 1,
-      'Tanggal': formatDate(opname.tanggal_opname),
-      'Kode Barang': opname.product?.kode_barang || '-',
-      'Nama Barang': opname.product?.nama_barang || '-',
-      'Stok Sistem': opname.stok_sistem || 0,
-      'Stok Fisik': opname.stok_fisik || 0,
-      'Selisih': opname.selisih || 0,
-      'Petugas': opname.nama_petugas || '-',
-      'Status Penyesuaian': opname.status_penyesuaian || '-',
-      'Catatan': opname.catatan || '-'
-    }));
+    try {
+      const exportData = filteredOpnames.map((opname, index) => ({
+        'No': index + 1,
+        'Tanggal': formatDate(opname.tanggal_opname),
+        'Kode Barang': opname.product?.kode_barang || '-',
+        'Nama Barang': opname.product?.nama_barang || '-',
+        'Stok Sistem': opname.stok_sistem || 0,
+        'Stok Fisik': opname.stok_fisik || 0,
+        'Selisih': opname.selisih || 0,
+        'Petugas': opname.nama_petugas || '-',
+        'Status Penyesuaian': opname.status_penyesuaian || '-',
+        'Catatan': opname.catatan || '-'
+      }));
 
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.json_to_sheet(exportData);
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(exportData);
 
-    ws['!cols'] = [
-      { wch: 5 },  // No
-      { wch: 12 }, // Tanggal
-      { wch: 15 }, // Kode Barang
-      { wch: 30 }, // Nama Barang
-      { wch: 12 }, // Stok Sistem
-      { wch: 12 }, // Stok Fisik
-      { wch: 10 }, // Selisih
-      { wch: 20 }, // Petugas
-      { wch: 18 }, // Status
-      { wch: 30 }  // Catatan
-    ];
+      ws['!cols'] = [
+        { wch: 5 },
+        { wch: 12 },
+        { wch: 15 },
+        { wch: 30 },
+        { wch: 12 },
+        { wch: 12 },
+        { wch: 10 },
+        { wch: 20 },
+        { wch: 18 },
+        { wch: 30 }
+      ];
 
-    const range = XLSX.utils.decode_range(ws['!ref']);
-    for (let R = range.s.r; R <= range.e.r; ++R) {
-      for (let C = range.s.c; C <= range.e.c; ++C) {
-        const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
-        if (!ws[cellAddress]) continue;
-        
-        if (R === 0) {
-          ws[cellAddress].s = {
-            font: { bold: true, color: { rgb: "FFFFFF" } },
-            fill: { fgColor: { rgb: "000000" } },
-            alignment: { horizontal: "center", vertical: "center" },
-            border: {
-              top: { style: "thin", color: { rgb: "000000" } },
-              bottom: { style: "thin", color: { rgb: "000000" } },
-              left: { style: "thin", color: { rgb: "000000" } },
-              right: { style: "thin", color: { rgb: "000000" } }
-            }
-          };
-        } else {
-          ws[cellAddress].s = {
-            alignment: { 
-              horizontal: C === 0 || C === 4 || C === 5 || C === 6 ? "center" : "left",
-              vertical: "center" 
-            },
-            border: {
-              top: { style: "thin", color: { rgb: "CCCCCC" } },
-              bottom: { style: "thin", color: { rgb: "CCCCCC" } },
-              left: { style: "thin", color: { rgb: "CCCCCC" } },
-              right: { style: "thin", color: { rgb: "CCCCCC" } }
-            },
-            fill: { fgColor: { rgb: R % 2 === 0 ? "F9FAFB" : "FFFFFF" } }
-          };
+      const range = XLSX.utils.decode_range(ws['!ref']);
+      for (let R = range.s.r; R <= range.e.r; ++R) {
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+          const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+          if (!ws[cellAddress]) continue;
+          
+          if (R === 0) {
+            ws[cellAddress].s = {
+              font: { bold: true, color: { rgb: "FFFFFF" } },
+              fill: { fgColor: { rgb: "000000" } },
+              alignment: { horizontal: "center", vertical: "center" },
+              border: {
+                top: { style: "thin", color: { rgb: "000000" } },
+                bottom: { style: "thin", color: { rgb: "000000" } },
+                left: { style: "thin", color: { rgb: "000000" } },
+                right: { style: "thin", color: { rgb: "000000" } }
+              }
+            };
+          } else {
+            ws[cellAddress].s = {
+              alignment: { 
+                horizontal: C === 0 || C === 4 || C === 5 || C === 6 ? "center" : "left",
+                vertical: "center" 
+              },
+              border: {
+                top: { style: "thin", color: { rgb: "CCCCCC" } },
+                bottom: { style: "thin", color: { rgb: "CCCCCC" } },
+                left: { style: "thin", color: { rgb: "CCCCCC" } },
+                right: { style: "thin", color: { rgb: "CCCCCC" } }
+              },
+              fill: { fgColor: { rgb: R % 2 === 0 ? "F9FAFB" : "FFFFFF" } }
+            };
+          }
         }
       }
-    }
 
-    XLSX.utils.book_append_sheet(wb, ws, "Stok Opname");
-    const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
-    XLSX.writeFile(wb, `Stok_Opname_${timestamp}.xlsx`);
-    
-    setSuccess('✓ Data berhasil di-export!');
-    setTimeout(() => setSuccess(''), 3000);
-  } catch (err) {
-    console.error('Error exporting:', err);
-    setError('Gagal export data');
-    setTimeout(() => setError(''), 3000);
-  }
-};
+      XLSX.utils.book_append_sheet(wb, ws, "Stok Opname");
+      const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+      XLSX.writeFile(wb, `Stok_Opname_${timestamp}.xlsx`);
+      
+      setSuccess('✓ Data berhasil di-export!');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      console.error('Error exporting:', err);
+      setError('Gagal export data');
+      setTimeout(() => setError(''), 3000);
+    }
+  };
 
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('id-ID', {
@@ -333,7 +333,6 @@ const StokOpnameAdmin = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -345,7 +344,6 @@ const StokOpnameAdmin = () => {
           </div>
         </div>
 
-        {/* Alert Messages */}
         {success && (
           <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg text-green-700">
             {success}
@@ -357,10 +355,7 @@ const StokOpnameAdmin = () => {
           </div>
         )}
 
-        {/* Form Row 1 */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-          
-          {/* 1. Tanggal Opname */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
               Tanggal Opname <span className="text-red-500">*</span>
@@ -373,7 +368,6 @@ const StokOpnameAdmin = () => {
             />
           </div>
 
-          {/* 2. Pilih Barang (Dropdown Search) */}
           <div className="relative" ref={dropdownRef}>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
               Pilih Barang <span className="text-red-500">*</span>
@@ -408,10 +402,8 @@ const StokOpnameAdmin = () => {
                 </div>
               )}
 
-              {/* Dropdown Content Absolute */}
               {showDropdown && !selectedProduct && (
                 <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg overflow-hidden">
-                  {/* Search Box */}
                   <div className="p-3 border-b border-gray-200 bg-gray-50">
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -426,7 +418,6 @@ const StokOpnameAdmin = () => {
                     </div>
                   </div>
 
-                  {/* List Item */}
                   <div className="max-h-64 overflow-y-auto">
                     {filteredProducts.length === 0 ? (
                       <div className="p-4 text-center text-gray-500">
@@ -456,7 +447,6 @@ const StokOpnameAdmin = () => {
             </div>
           </div>
 
-          {/* 3. Nama Petugas */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
               Nama Petugas
@@ -471,7 +461,6 @@ const StokOpnameAdmin = () => {
           </div>
         </div>
 
-        {/* Product Info Card */}
         {selectedProduct && (
           <div className="mb-4 p-4 bg-purple-50 border border-purple-200 rounded-lg">
             <h3 className="font-bold text-purple-900 text-lg mb-3">{selectedProduct.nama_barang}</h3>
@@ -507,13 +496,7 @@ const StokOpnameAdmin = () => {
                 <p className="font-semibold text-purple-600 text-lg">{selectedProduct.stok || 0}</p>
               </div>
             </div>
-            {selectedProduct.qr_code && (
-                <div className="mt-2">
-                  <QrCode className="w-12 h-12 text-purple-600" />
-                </div>
-            )}
 
-            {/* Stok Fisik Input & Selisih */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 mt-4 pt-4 border-t border-purple-200">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -541,7 +524,6 @@ const StokOpnameAdmin = () => {
               </div>
             </div>
 
-            {/* Catatan */}
             <div className="mb-4">
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Catatan (Opsional)
@@ -555,7 +537,6 @@ const StokOpnameAdmin = () => {
               />
             </div>
 
-            {/* Checkbox Penyesuaian */}
             <div className="flex items-start gap-3 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
               <input
                 type="checkbox"
@@ -577,7 +558,6 @@ const StokOpnameAdmin = () => {
           </div>
         )}
 
-        {/* Action Buttons */}
         <div className="flex gap-3">
           <button
             onClick={handleSimpan}
@@ -597,7 +577,6 @@ const StokOpnameAdmin = () => {
         </div>
       </div>
 
-      {/* Riwayat Stok Opname */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200">
         <div className="px-6 py-4 border-b border-gray-200">
           <div className="flex flex-wrap items-center justify-between gap-3">
