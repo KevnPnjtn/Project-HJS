@@ -61,7 +61,6 @@ export const productapi = {
     
     const cached = cache.get(cacheKey);
     if (cached) {
-      console.log('✅ Cache hit:', cacheKey);
       return cached;
     }
 
@@ -79,7 +78,6 @@ export const productapi = {
     
     const cached = cache.get(cacheKey);
     if (cached) {
-      console.log('✅ Cache hit:', cacheKey);
       return cached;
     }
 
@@ -96,7 +94,6 @@ export const productapi = {
     
     const cached = cache.get(cacheKey);
     if (cached) {
-      console.log('✅ Cache hit:', cacheKey);
       return cached;
     }
 
@@ -113,7 +110,6 @@ export const productapi = {
     const response = await api.post('/dev/products', productData);
     
     cache.invalidate('products:');
-    console.log('🗑️ Cache invalidated: products');
     
     return response.data;
   },
@@ -122,7 +118,6 @@ export const productapi = {
     const response = await api.put(`/dev/products/${id}`, productData);
     
     cache.invalidate('products:');
-    console.log('🗑️ Cache invalidated: products');
     
     return response.data;
   },
@@ -131,23 +126,16 @@ export const productapi = {
     const response = await api.delete(`/dev/products/${id}`);
     
     cache.invalidate('products:');
-    console.log('🗑️ Cache invalidated: products');
     
     return response.data;
   },
 
   scanQr: async (qrData) => {
-  try {
     const response = await api.post('/dev/products/scan-qr', qrData);
-    return response;  
-  } catch (error) {
-    console.error('Scan QR API Error:', error.response?.data || error);
-    throw error;  
-  }
-},
+    return response;
+  },
 
   clearCache: () => {
     cache.invalidate('*');
-    console.log('🗑️ All cache cleared');
   }
-};  
+};

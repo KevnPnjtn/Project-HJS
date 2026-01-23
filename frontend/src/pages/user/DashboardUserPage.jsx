@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Package, PackagePlus, PackageMinus, QrCode, 
-  TrendingUp, TrendingDown, AlertCircle, Calendar, Clock
+  TrendingUp, TrendingDown, Calendar, Clock
 } from 'lucide-react';
 import { stockapi } from '../../services/stockapi';
 
@@ -24,35 +24,23 @@ const DashboardUserPage = ({ onNavigate }) => {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      
-      // Fetch transaksi masuk
-      const masukResponse = await stockapi.getAll({ 
-        jenis_transaksi: 'IN',
-        limit: 100
-      });
-      const transaksiMasuk = masukResponse.data?.data || [];
-      
-      // Fetch transaksi keluar
-      const keluarResponse = await stockapi.getAll({ 
-        jenis_transaksi: 'OUT',
-        limit: 100
-      });
-      const transaksiKeluar = keluarResponse.data?.data || [];
-      
-      // Gabungkan dan sort berdasarkan tanggal terbaru
-      const allTransactions = [...transaksiMasuk, ...transaksiKeluar].sort(
+       
+      const summaryResponse = await stockapi.getSummary();
+      const summaryData = summaryResponse.data || {};
+       
+      const allTransactionsResponse = await stockapi.getAll({ per_page: 1000 });
+      const allTransactions = allTransactionsResponse.data?.data || []; 
+      const sortedTransactions = allTransactions.sort(
         (a, b) => new Date(b.created_at) - new Date(a.created_at)
       );
-      
-      // Hitung transaksi hari ini
+       
       const today = new Date().toDateString();
-      const transaksiHariIni = allTransactions.filter(
+      const transaksiHariIni = sortedTransactions.filter(
         t => new Date(t.created_at).toDateString() === today
       ).length;
-      
-      // Hitung total masuk dan keluar
-      const totalMasuk = transaksiMasuk.reduce((sum, t) => sum + (t.jumlah || 0), 0);
-      const totalKeluar = transaksiKeluar.reduce((sum, t) => sum + (t.jumlah || 0), 0);
+       
+      const totalMasuk = summaryData.total_in || 0;
+      const totalKeluar = summaryData.total_out || 0;
       
       setStats({
         totalMasuk,
@@ -60,9 +48,8 @@ const DashboardUserPage = ({ onNavigate }) => {
         transaksiHariIni,
         perubahanStok: totalMasuk - totalKeluar
       });
-      
-      // Ambil 10 transaksi terakhir
-      setRecentTransactions(allTransactions.slice(0, 10));
+       
+      setRecentTransactions(sortedTransactions.slice(0, 10));
       
     } catch (error) {
       console.error('Gagal mengambil data dashboard:', error);
@@ -81,8 +68,7 @@ const DashboardUserPage = ({ onNavigate }) => {
       minute: '2-digit'
     });
   };
-
-  // Filter transactions based on active tab
+ 
   const filteredTransactions = recentTransactions.filter(transaction => {
     if (activeTab === 'semua') return true;
     if (activeTab === 'masuk') return transaction.jenis_transaksi === 'IN';
@@ -102,7 +88,7 @@ const DashboardUserPage = ({ onNavigate }) => {
     <div className="space-y-6">
       {/* Welcome Section */}
       <div className="bg-gradient-to-r from-purple-600 to-purple-800 rounded-2xl p-6 text-white shadow-lg">
-        <h1 className="text-2xl font-bold mb-2">Selamat Datang! </h1>
+        <h1 className="text-2xl font-bold mb-2">Selamat Datang!</h1>
         <p className="text-purple-100">Kelola inventory Anda dengan mudah dan efisien</p>
       </div>
 
