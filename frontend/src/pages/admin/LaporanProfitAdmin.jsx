@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { TrendingUp, Calendar, Package, Download, Filter, X, Search } from 'lucide-react';
 import { productapi } from '../../services/productapi';
 import { stockapi } from '../../services/stockapi';
+import * as XLSX from 'xlsx';
 
 const LaporanProfitAdmin = () => {
   const [products, setProducts] = useState([]);
@@ -29,7 +30,7 @@ const LaporanProfitAdmin = () => {
 
   useEffect(() => {
     applyFilters();
-  }, [filters, transactions]);
+  }, [filters, transactions, products]);
 
   const fetchData = async () => {
     try {
@@ -39,8 +40,14 @@ const LaporanProfitAdmin = () => {
         productapi.getAll({ per_page: 1000 }),
         stockapi.getAll({ per_page: 1000 })
       ]);
-
-      const productsData = productsResponse.data?.data || [];
+ 
+      let productsData = [];
+      if (productsResponse?.data?.data && Array.isArray(productsResponse.data.data)) {
+        productsData = productsResponse.data.data;
+      } else if (productsResponse?.data && Array.isArray(productsResponse.data)) {
+        productsData = productsResponse.data;
+      }
+ 
       const transactionsData = transactionsResponse.data?.data || [];
       
       setProducts(productsData);
@@ -55,13 +62,11 @@ const LaporanProfitAdmin = () => {
 
   const applyFilters = () => {
     let filtered = transactions.filter(t => t.jenis_transaksi === 'OUT');
-
-    // Filter by product
+ 
     if (filters.productId) {
-      filtered = filtered.filter(t => t.product_id === filters.productId);
+      filtered = filtered.filter(t => String(t.product_id) === String(filters.productId));
     }
-
-    // Filter by date range
+ 
     if (filters.startDate) {
       filtered = filtered.filter(t => {
         const transDate = new Date(t.created_at);
@@ -78,22 +83,20 @@ const LaporanProfitAdmin = () => {
         return transDate <= endDate;
       });
     }
-
-    // Filter by search query
+ 
     if (filters.searchQuery) {
       const query = filters.searchQuery.toLowerCase();
       filtered = filtered.filter(t => {
-        const product = products.find(p => p.product_id === t.product_id);
+        const product = products.find(p => String(p.product_id) === String(t.product_id));
         return (
           product?.nama_barang?.toLowerCase().includes(query) ||
           product?.kode_barang?.toLowerCase().includes(query)
         );
       });
     }
-
-    // Calculate profit for each transaction
+ 
     const enrichedData = filtered.map(t => {
-      const product = products.find(p => p.product_id === t.product_id);
+      const product = products.find(p => String(p.product_id) === String(t.product_id));
       
       if (!product) return null;
 
@@ -115,8 +118,7 @@ const LaporanProfitAdmin = () => {
         profit
       };
     }).filter(Boolean);
-
-    // Calculate summary
+ 
     const newSummary = enrichedData.reduce((acc, item) => ({
       totalModal: acc.totalModal + item.totalModal,
       totalPenjualan: acc.totalPenjualan + item.totalPenjualan,
@@ -146,32 +148,116 @@ const LaporanProfitAdmin = () => {
     });
   };
 
-  const exportToCSV = () => {
-    const headers = ['Tanggal', 'Kode Barang', 'Nama Barang', 'Qty', 'Harga Modal', 'Harga Jual', 'Total Modal', 'Total Penjualan', 'Profit'];
-    
-    const rows = filteredData.map(item => [
-      formatDate(item.created_at),
-      item.product.kode_barang,
-      item.product.nama_barang,
-      item.jumlah,
-      item.hargaModal,
-      item.hargaJual,
-      item.totalModal,
-      item.totalPenjualan,
-      item.profit
-    ]);
+  const exportToExcel = () => {
+    try {
+      const exportData = filteredData.map((item, index) => ({
+        'No': index + 1,
+        'Tanggal': formatDateForExport(item.created_at),
+        'Kode Barang': item.product.kode_barang || '-',
+        'Nama Barang': item.product.nama_barang || '-',
+        'Qty': item.jumlah,
+        'Harga Modal': item.hargaModal,
+        'Harga Jual': item.hargaJual,
+        'Total Modal': item.totalModal,
+        'Total Penjualan': item.totalPenjualan,
+        'Profit': item.profit
+      }));
+ 
+      exportData.push({
+        'No': '',
+        'Tanggal': '',
+        'Kode Barang': '',
+        'Nama Barang': 'TOTAL',
+        'Qty': summary.totalQty,
+        'Harga Modal': '',
+        'Harga Jual': '',
+        'Total Modal': summary.totalModal,
+        'Total Penjualan': summary.totalPenjualan,
+        'Profit': summary.totalProfit
+      });
 
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(row => row.join(','))
-    ].join('\n');
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(exportData);
+ 
+      ws['!cols'] = [
+        { wch: 5 },
+        { wch: 18 },
+        { wch: 15 },
+        { wch: 30 },
+        { wch: 8 },
+        { wch: 15 },
+        { wch: 15 },
+        { wch: 18 },
+        { wch: 18 },
+        { wch: 18 }
+      ];
 
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `laporan-profit-${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
+      const range = XLSX.utils.decode_range(ws['!ref']);
+      for (let R = range.s.r; R <= range.e.r; ++R) {
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+          const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+          if (!ws[cellAddress]) continue;
+          
+          if (R === 0) {
+            ws[cellAddress].s = {
+              font: { bold: true, color: { rgb: "FFFFFF" } },
+              fill: { fgColor: { rgb: "16A34A" } },
+              alignment: { horizontal: "center", vertical: "center" },
+              border: {
+                top: { style: "thin", color: { rgb: "000000" } },
+                bottom: { style: "thin", color: { rgb: "000000" } },
+                left: { style: "thin", color: { rgb: "000000" } },
+                right: { style: "thin", color: { rgb: "000000" } }
+              }
+            };
+          }
+          else if (R === range.e.r) {
+            ws[cellAddress].s = {
+              font: { bold: true },
+              fill: { fgColor: { rgb: "F3F4F6" } },
+              alignment: { 
+                horizontal: C === 0 || C === 4 ? "center" : (C >= 5 ? "right" : "left"), 
+                vertical: "center" 
+              },
+              border: {
+                top: { style: "thin", color: { rgb: "000000" } },
+                bottom: { style: "thin", color: { rgb: "000000" } },
+                left: { style: "thin", color: { rgb: "000000" } },
+                right: { style: "thin", color: { rgb: "000000" } }
+              }
+            };
+          }
+          else {
+            ws[cellAddress].s = {
+              alignment: { 
+                horizontal: C === 0 || C === 4 ? "center" : (C >= 5 ? "right" : "left"), 
+                vertical: "center" 
+              },
+              border: {
+                top: { style: "thin", color: { rgb: "E5E7EB" } },
+                bottom: { style: "thin", color: { rgb: "E5E7EB" } },
+                left: { style: "thin", color: { rgb: "E5E7EB" } },
+                right: { style: "thin", color: { rgb: "E5E7EB" } }
+              },
+              fill: { fgColor: { rgb: R % 2 === 0 ? "FFFFFF" : "F9FAFB" } }
+            };
+          }
+
+          if (C >= 5 && C <= 9 && R > 0) {
+            ws[cellAddress].z = '#,##0';
+          }
+        }
+      }
+
+      XLSX.utils.book_append_sheet(wb, ws, "Laporan Profit");
+      
+      const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+      XLSX.writeFile(wb, `Laporan_Profit_${timestamp}.xlsx`);
+
+    } catch (error) {
+      console.error('Error exporting:', error);
+      alert('Gagal export data');
+    }
   };
 
   const formatCurrency = (amount) => {
@@ -193,10 +279,18 @@ const LaporanProfitAdmin = () => {
     });
   };
 
+  const formatDateForExport = (dateString) => {
+    return new Date(dateString).toLocaleDateString('id-ID', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
-        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-indigo-600"></div>
+        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-green-600"></div>
       </div>
     );
   }
@@ -286,7 +380,7 @@ const LaporanProfitAdmin = () => {
                 placeholder="Nama/Kode barang..."
                 value={filters.searchQuery}
                 onChange={(e) => handleFilterChange('searchQuery', e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
               />
             </div>
           </div>
@@ -299,7 +393,7 @@ const LaporanProfitAdmin = () => {
             <select
               value={filters.productId}
               onChange={(e) => handleFilterChange('productId', e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
             >
               <option value="">Semua Produk</option>
               {products.map(product => (
@@ -319,7 +413,7 @@ const LaporanProfitAdmin = () => {
               type="date"
               value={filters.startDate}
               onChange={(e) => handleFilterChange('startDate', e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
             />
           </div>
 
@@ -332,7 +426,7 @@ const LaporanProfitAdmin = () => {
               type="date"
               value={filters.endDate}
               onChange={(e) => handleFilterChange('endDate', e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
             />
           </div>
         </div>
@@ -340,19 +434,26 @@ const LaporanProfitAdmin = () => {
         <div className="flex items-center gap-3 mt-4">
           <button
             onClick={resetFilters}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
           >
             <X className="w-4 h-4" />
             Reset Filter
           </button>
           
           <button
-            onClick={exportToCSV}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            onClick={exportToExcel}
+            disabled={filteredData.length === 0}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium disabled:bg-gray-300 disabled:cursor-not-allowed shadow-md hover:shadow-lg"
           >
             <Download className="w-4 h-4" />
-            Export CSV
+            Export
           </button>
+
+          {filteredData.length > 0 && (
+            <span className="text-sm text-gray-500 ml-2">
+              {filteredData.length} transaksi siap di-export
+            </span>
+          )}
         </div>
       </div>
 
@@ -367,29 +468,41 @@ const LaporanProfitAdmin = () => {
 
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-50">
+            <thead className="bg-green-600 text-white">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tanggal</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Kode</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nama Barang</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Qty</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Harga Modal</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Harga Jual</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total Modal</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total Penjualan</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Profit</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold uppercase">Tanggal</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold uppercase">Kode</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold uppercase">Nama Barang</th>
+                <th className="px-6 py-3 text-right text-xs font-semibold uppercase">Qty</th>
+                <th className="px-6 py-3 text-right text-xs font-semibold uppercase">Harga Modal</th>
+                <th className="px-6 py-3 text-right text-xs font-semibold uppercase">Harga Jual</th>
+                <th className="px-6 py-3 text-right text-xs font-semibold uppercase">Total Modal</th>
+                <th className="px-6 py-3 text-right text-xs font-semibold uppercase">Total Penjualan</th>
+                <th className="px-6 py-3 text-right text-xs font-semibold uppercase">Profit</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {filteredData.length === 0 ? (
                 <tr>
                   <td colSpan="9" className="px-6 py-12 text-center text-gray-500">
-                    Tidak ada data transaksi
+                    <Package className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+                    <p className="text-lg font-medium">Tidak ada transaksi penjualan</p>
+                    {filters.productId ? (
+                      <div className="mt-2">
+                        <p className="text-sm text-gray-600">
+                          Produk "{products.find(p => String(p.product_id) === String(filters.productId))?.nama_barang}" 
+                          belum memiliki transaksi penjualan
+                        </p>
+                        <p className="text-xs text-gray-400 mt-1">Coba pilih produk lain atau ubah filter tanggal</p>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-400 mt-1">Silakan ubah filter atau coba periode lain</p>
+                    )}
                   </td>
                 </tr>
               ) : (
                 filteredData.map((item, index) => (
-                  <tr key={item.transaction_id || index} className="hover:bg-gray-50">
+                  <tr key={item.transaction_id || index} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4 text-sm text-gray-900">
                       {formatDate(item.created_at)}
                     </td>
@@ -424,7 +537,7 @@ const LaporanProfitAdmin = () => {
               )}
             </tbody>
             {filteredData.length > 0 && (
-              <tfoot className="bg-gray-50 font-bold">
+              <tfoot className="bg-gray-50 font-bold border-t-2 border-gray-300">
                 <tr>
                   <td colSpan="3" className="px-6 py-4 text-sm text-gray-900">
                     TOTAL
