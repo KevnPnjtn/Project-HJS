@@ -171,78 +171,90 @@ const ProductManagementAdmin = () => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  setError('');
 
-    try {
-      const user = JSON.parse(localStorage.getItem('user') || sessionStorage.getItem('user') || '{}');
-      
-      const dataToSubmit = {
-        kode_barang: formData.kode_barang.trim(),
-        nama_barang: formData.nama_barang.trim(),
-        jenis_barang: formData.jenis_barang || null,
-        satuan: formData.satuan,
-        stok_minimal: formData.stok_minimal ? parseInt(formData.stok_minimal) : 0,
-        harga_modal: parseFloat(formData.harga_modal) || 0,
-        harga_jual: parseFloat(formData.harga_jual) || 0,
-        user_id: user.user_id || null
-      };
-
-      if (!dataToSubmit.kode_barang || !dataToSubmit.nama_barang || !dataToSubmit.satuan) {
-        setError('Mohon lengkapi semua field yang wajib diisi');
-        return;
-      }
-
-      if (modalMode === 'add') {
-        await productapi.create(dataToSubmit);
-      } else {
-        await productapi.update(selectedProduct.product_id, dataToSubmit);
-      }
-      
-      handleCloseModal();
-      setPagination(prev => ({ ...prev, currentPage: 1 }));
-      fetchProducts();
-    } catch (error) {
-      console.error('Submit error:', error);
-      const errorMsg = error.response?.data?.message || 
-                       error.response?.data?.error || 
-                       'Gagal menyimpan produk. Periksa kembali data yang diinput.';
-      setError(errorMsg);
+  try { 
+    const userStr = localStorage.getItem('user') || sessionStorage.getItem('user');
+    const user = userStr ? JSON.parse(userStr) : {};
+     
+    const dataToSubmit = {
+      kode_barang: formData.kode_barang.trim(),
+      nama_barang: formData.nama_barang.trim(),
+      jenis_barang: formData.jenis_barang.trim() || null,  
+      satuan: formData.satuan,
+      stok_minimal: formData.stok_minimal ? parseInt(formData.stok_minimal) : 0,
+      stok: 0,  
+      harga_modal: parseFloat(formData.harga_modal) || 0,
+      harga_jual: parseFloat(formData.harga_jual) || 0,
+      user_id: user.user_id || null
+    };
+ 
+    if (!dataToSubmit.kode_barang || !dataToSubmit.nama_barang || !dataToSubmit.satuan) {
+      setError('Mohon lengkapi semua field yang wajib diisi (Kode Barang, Nama Barang, Satuan)');
+      return;
     }
-  };
 
-  const handleDelete = async (productId) => {
-    if (window.confirm('Apakah Anda yakin ingin menghapus produk ini?')) {
-      try {
-        await productapi.delete(productId);
-        fetchProducts();
-      } catch (error) {
-        console.error('Delete error:', error);
-        alert('Gagal menghapus produk');
-      }
+    if (dataToSubmit.harga_modal <= 0 || dataToSubmit.harga_jual <= 0) {
+      setError('Harga Modal dan Harga Jual harus lebih dari 0');
+      return;
     }
-  };
 
-  const handleOpenQRModal = async (product) => {
-    setSelectedQRProduct(product);
-    setShowQRModal(true);
+    if (modalMode === 'add') {
+      await productapi.create(dataToSubmit);
+    } else {
+      await productapi.update(selectedProduct.product_id, dataToSubmit);
+    }
     
-    try {
-      const qrData = product.kode_barang;
-      const dataURL = await QRCodeLib.toDataURL(qrData, {
-        width: 300,
-        margin: 2,
-        color: {
-          dark: '#000000',
-          light: '#FFFFFF'
-        }
-      });
-      setQrCodeDataURL(dataURL);
-    } catch (error) {
-      console.error('QR generation error:', error);
+    handleCloseModal();
+    setPagination(prev => ({ ...prev, currentPage: 1 }));
+    fetchProducts();
+  } catch (error) {
+    if (error.response?.status === 422) {
+      const errors = error.response?.data?.errors;
+      if (errors) {
+        const errorMessages = Object.values(errors).flat().join(', ');
+        setError(`Validasi gagal: ${errorMessages}`);
+      } else {
+        setError(error.response?.data?.message || 'Validasi gagal. Periksa kembali data yang diinput.');
+      }
+    } else {
+      setError(error.response?.data?.message || 'Gagal menyimpan produk. Silakan coba lagi.');
     }
-  };
+  }
+};
+
+const handleDelete = async (productId) => {
+  if (window.confirm('Apakah Anda yakin ingin menghapus produk ini?')) {
+    try {
+      await productapi.delete(productId);
+      fetchProducts();
+    } catch {
+      alert('Gagal menghapus produk');
+    }
+  }
+};
+
+const handleOpenQRModal = async (product) => {
+  setSelectedQRProduct(product);
+  setShowQRModal(true);
+  
+  try {
+    const qrData = product.kode_barang;
+    const dataURL = await QRCodeLib.toDataURL(qrData, {
+      width: 300,
+      margin: 2,
+      color: {
+        dark: '#000000',
+        light: '#FFFFFF'
+      }
+    });
+    setQrCodeDataURL(dataURL);
+  } catch {
+    // QR code generation failed silently
+  }
+};
 
   const handleDownloadQR = () => {
     if (!qrCodeDataURL || !selectedQRProduct) return;

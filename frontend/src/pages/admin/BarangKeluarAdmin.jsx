@@ -147,7 +147,6 @@ const BarangKeluarAdmin = () => {
     setFormData({ ...formData, product_id: product.product_id });
     setSearchProduct(product.nama_barang);
     setShowDropdown(false);
-    setSuccess(`✓ Produk dipilih: ${product.nama_barang}`);
   };
 
   const handleSimpan = async () => {
@@ -280,8 +279,8 @@ const BarangKeluarAdmin = () => {
         setIsSelectionMode(false);
         fetchInitialData();
         setTimeout(() => setSuccess(''), 3000);
-      } catch (error) {
-        setError(`Gagal menghapus transaksi: ${error.response?.data?.message || error.message}`);
+      } catch {
+        setError('Gagal menghapus transaksi');
       } finally {
         setLoading(false);
       }
@@ -411,34 +410,36 @@ const BarangKeluarAdmin = () => {
             />
           </div>
 
-          {/* 2. Pilih Barang */}
+          {/* 2. Pilih Barang - Fixed Height Box */}
           <div className="relative" ref={dropdownRef}>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
               Pilih Barang <span className="text-red-500">*</span>
             </label>
             
-            <div className="relative">
+            {/* Container dengan tinggi tetap */}
+            <div className="h-[42px]">
               {!selectedProduct ? (
-                <div className="relative">
+                <div className="relative h-full">
                   <button
                     type="button"
                     onClick={() => setShowDropdown(!showDropdown)}
-                    className="w-full px-4 py-2.5 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 text-left bg-white hover:bg-gray-50 transition-all"
+                    className="w-full h-full px-4 py-2.5 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 text-left bg-white hover:bg-gray-50 transition-all"
                   >
                     <span className="text-gray-500">Pilih produk...</span>
                   </button>
                   <ChevronDown className={`absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 transition-transform ${showDropdown ? 'rotate-180' : ''}`} />
                 </div>
               ) : (
-                <div className="flex gap-2 animate-in fade-in duration-300">
-                  <div className="flex-1 px-4 py-2.5 border-2 border-red-400 bg-gradient-to-r from-red-50 to-red-100 rounded-lg shadow-sm">
-                    <p className="font-semibold text-red-900">{selectedProduct.nama_barang}</p>
-                    <p className="text-xs text-red-600">Kode: {selectedProduct.kode_barang} • Stok: {selectedProduct.stok}</p>
+                <div className="flex gap-2 h-full">
+                  <div className="flex-1 px-4 py-2 border-2 border-red-400 bg-gradient-to-r from-red-50 to-red-100 rounded-lg shadow-sm flex items-center">
+                    <div className="overflow-hidden">
+                      <p className="font-semibold text-red-900 text-sm truncate">{selectedProduct.nama_barang}</p>
+                    </div>
                   </div>
                   <button
                     type="button"
                     onClick={handleClearSelection}
-                    className="px-3 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-all hover:scale-105"
+                    className="px-3 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-all hover:scale-105 flex items-center justify-center"
                     title="Hapus pilihan"
                   >
                     <X className="w-5 h-5" />
@@ -537,9 +538,9 @@ const BarangKeluarAdmin = () => {
           </div>
         </div>
 
-        {/* Product Info Card */}
+        {/* Product Info Card - Only shown when product is selected */}
         {selectedProduct && (
-          <div className="mb-4 p-5 bg-gradient-to-r from-red-50 to-red-100 border-2 border-red-300 rounded-xl shadow-md animate-in slide-in-from-top-2 duration-300">
+          <div className="mb-4 p-5 bg-gradient-to-r from-red-50 to-red-100 border-2 border-red-300 rounded-xl shadow-md">
             <div className="flex items-start justify-between">
               <div className="flex-1">
                 <h3 className="font-bold text-red-900 text-lg mb-3 flex items-center gap-2">
@@ -609,7 +610,6 @@ const BarangKeluarAdmin = () => {
         <div className="px-6 py-4 border-b border-gray-200 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-bold text-gray-900">Daftar Transaksi Barang Keluar</h2>
           <div className="flex gap-3">
-            {/* ✅ Bulk Delete Button */}
             {!isSelectionMode ? (
               <>
                 <div className="relative">
@@ -669,7 +669,6 @@ const BarangKeluarAdmin = () => {
           <table className="w-full">
             <thead className="bg-red-600 text-white">
               <tr>
-                {/* ✅ Checkbox Column */}
                 {isSelectionMode && (
                   <th className="text-center py-4 px-4 text-sm font-semibold">
                     <input
@@ -712,7 +711,6 @@ const BarangKeluarAdmin = () => {
                         : 'hover:bg-red-50'
                     }`}
                   >
-                    {/* ✅ Checkbox Cell */}
                     {isSelectionMode && (
                       <td className="py-4 px-4 text-center">
                         <input
@@ -768,7 +766,6 @@ const BarangKeluarAdmin = () => {
                 Menampilkan {filteredTransactions.length} transaksi dari total {pagination.totalItems} transaksi
               </p>
               
-              {/* ✅ Pagination Controls */}
               {pagination.totalPages > 1 && (
                 <div className="flex items-center gap-2">
                   <button
@@ -779,7 +776,6 @@ const BarangKeluarAdmin = () => {
                     ← Prev
                   </button>
                   
-                  {/* Page Numbers */}
                   <div className="flex gap-1">
                     {Array.from({ length: Math.min(pagination.totalPages, 5) }, (_, i) => {
                       let pageNum;

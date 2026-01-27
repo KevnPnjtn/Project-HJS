@@ -134,15 +134,22 @@ class ProductController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'kode_barang' => 'required|string|max:50|unique:products,kode_barang',
-            'nama_barang' => 'required|string|max:255',
-            'jenis_barang' => 'nullable|string|max:255',
-            'satuan' => 'required|string|max:50',
-            'stok_minimal' => 'nullable|integer|min:0',
-            'stok' => 'nullable|integer|min:0',
-            'harga_modal' => 'required|numeric|min:0',
-            'harga_jual' => 'required|numeric|min:0',
-            'user_id' => 'nullable|exists:users,user_id',
-        ]);
+    'nama_barang' => 'required|string|max:255',
+    'jenis_barang' => 'nullable|string|max:255',
+    'satuan' => 'required|string|max:50',
+    'stok_minimal' => 'nullable|integer|min:0',
+    'stok' => 'nullable|integer|min:0',
+    'harga_modal' => 'required|numeric|min:0',
+    'harga_jual' => 'required|numeric|min:0',
+    'user_id' => 'nullable|exists:users,user_id',
+    ], [
+    'kode_barang.required' => 'Kode barang wajib diisi',
+    'kode_barang.unique' => 'Kode barang sudah digunakan',
+    'nama_barang.required' => 'Nama barang wajib diisi',
+    'satuan.required' => 'Satuan wajib dipilih',
+    'harga_modal.required' => 'Harga modal wajib diisi',
+    'harga_jual.required' => 'Harga jual wajib diisi',
+    ]);
 
         if ($validator->fails()) {
             Log::error('Product validation failed:', [

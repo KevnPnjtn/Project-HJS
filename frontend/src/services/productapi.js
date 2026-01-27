@@ -107,7 +107,12 @@ export const productapi = {
   },
 
   create: async (productData) => {
-    const response = await api.post('/dev/products', productData);
+    const response = await api.post('/dev/products', productData, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      }
+    });
     
     cache.invalidate('products:');
     
@@ -115,7 +120,12 @@ export const productapi = {
   },
 
   update: async (id, productData) => {
-    const response = await api.put(`/dev/products/${id}`, productData);
+    const response = await api.put(`/dev/products/${id}`, productData, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      }
+    });
     
     cache.invalidate('products:');
     
