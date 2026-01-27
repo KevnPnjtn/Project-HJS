@@ -61,7 +61,8 @@ class AuthController extends Controller
             } catch (\Exception $e) {
                 Log::warning('✗ Email send failed (non-critical):', [
                     'user_id' => $user->user_id,
-                    'error' => $e->getMessage()
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString()
                 ]);
             } finally {
                 set_time_limit(30); 

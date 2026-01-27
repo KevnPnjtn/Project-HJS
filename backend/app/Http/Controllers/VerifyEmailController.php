@@ -19,7 +19,6 @@ class VerifyEmailController extends Controller
         ]);
 
         try {
-            // 1. Find user by ID
             $user = User::where('user_id', $id)->first();
 
             if (!$user) {

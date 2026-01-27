@@ -3,7 +3,6 @@
 namespace App\Notifications;
 
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
@@ -25,16 +24,16 @@ class ResetPasswordNotification extends Notification
 
     public function toMail($notifiable)
     {
-        $frontendUrl = env('FRONTEND_URL', 'http://localhost:5173');
-        $resetUrl = "{$frontendUrl}/reset-password?token={$this->token}&email={$notifiable->getEmailForPasswordReset()}";
+        $frontendUrl = config('app.frontend_url', 'http://localhost:5173');
+        $resetUrl = "{$frontendUrl}/reset-password?token={$this->token}&email={$notifiable->email}";
 
         return (new MailMessage)
-            ->subject('Reset Password - Barang Masuk System')
+            ->subject('Reset Password - Inventory System')
             ->greeting('Halo, ' . $notifiable->username . '!')
-            ->line('Anda menerima email ini karena kami menerima permintaan reset password untuk akun Anda.')
+            ->line('Kami menerima permintaan untuk mereset password akun Anda.')
             ->action('Reset Password', $resetUrl)
-            ->line('Link reset password ini akan kedaluwarsa dalam 60 menit.')
-            ->line('Jika Anda tidak meminta reset password, tidak perlu melakukan tindakan apapun.')
-            ->salutation('Salam, Tim Barang Masuk');
+            ->line('Link reset password ini akan kadaluwarsa dalam 60 menit.')
+            ->line('Jika Anda tidak meminta reset password, abaikan email ini.')
+            ->salutation('Terima kasih, Tim Inventory System');
     }
 }

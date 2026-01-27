@@ -9,24 +9,21 @@ use Illuminate\Support\Carbon;
 
 class VerifyEmail extends VerifyEmailBase
 {
-    /**
-     * Build the mail representation of the notification.
-     */
     public function toMail($notifiable)
     {
         $verificationUrl = $this->verificationUrl($notifiable);
 
         return (new MailMessage)
             ->subject('Verifikasi Email - Inventory System')
-            ->view('emails.verify-email', [
-                'user' => $notifiable,
-                'verificationUrl' => $verificationUrl,
-            ]);
+            ->greeting('Halo ' . $notifiable->username . '!')
+            ->line('Terima kasih telah mendaftar di Aplikasi Inventori.')
+            ->line('Silakan klik tombol di bawah ini untuk memverifikasi alamat email Anda.')
+            ->action('Verifikasi Email', $verificationUrl)
+            ->line('Link verifikasi ini akan kadaluwarsa dalam 60 menit.')
+            ->line('Jika Anda tidak membuat akun ini, abaikan email ini.')
+            ->salutation('Terima kasih, Tim Aplikasi Inventori');
     }
 
-    /**
-     * Get the verification URL for the given notifiable.
-     */
     protected function verificationUrl($notifiable)
     {
         $frontendUrl = config('app.frontend_url', 'http://localhost:5173');

@@ -10,3 +10,4 @@ Route::get('/', function () {
 Route::get('/login', function () {
     return response()->json(['message' => 'Login via API only']);
 })->name('login');
+    
