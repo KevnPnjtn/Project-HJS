@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Password as PasswordFacade;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cookie;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 
 class AuthController extends Controller
@@ -54,15 +55,16 @@ class AuthController extends Controller
             ]);
 
             DB::commit();
+            
+            // ✅ Send verification email (fire once)
             try {
                 set_time_limit(15);
                 event(new Registered($user));
-                Log::info('✓ Verification email sent', ['user_id' => $user->user_id]);
+                Log::info('✓ Verification email dispatched', ['user_id' => $user->user_id]);
             } catch (\Exception $e) {
                 Log::warning('✗ Email send failed (non-critical):', [
                     'user_id' => $user->user_id,
-                    'error' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString()
+                    'error' => $e->getMessage()
                 ]);
             } finally {
                 set_time_limit(30); 
@@ -221,6 +223,17 @@ class AuthController extends Controller
                 ], 400);
             }
 
+            $cacheKey = "resend_verification_{$user->user_id}";
+            
+            if (Cache::has($cacheKey)) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Mohon tunggu beberapa saat sebelum mengirim ulang email verifikasi.'
+                ], 429);
+            }
+
+            Cache::put($cacheKey, true, 60);
+
             try {
                 set_time_limit(15);
                 $user->sendEmailVerificationNotification();
@@ -299,6 +312,17 @@ class AuthController extends Controller
                 ], 403);
             }
 
+            $cacheKey = "forgot_password_{$user->user_id}";
+            
+            if (Cache::has($cacheKey)) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Mohon tunggu beberapa saat sebelum meminta reset password lagi.'
+                ], 429);
+            }
+
+            Cache::put($cacheKey, true, 60); 
+
             try {
                 $status = PasswordFacade::sendResetLink(['email' => $user->email]);
                 Log::info('✓ Password reset link dispatched', ['email' => $user->email]);
@@ -308,6 +332,7 @@ class AuthController extends Controller
                     'error' => $mailError->getMessage()
                 ]);
             }
+            
             return response()->json([
                 'status' => 'success',
                 'message' => 'Link reset password telah dikirim ke email Anda.',
