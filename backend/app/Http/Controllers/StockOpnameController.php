@@ -14,52 +14,61 @@ use Illuminate\Support\Facades\Auth;
 
 class StockOpnameController extends Controller
 {
+    private const CACHE_DURATION = 300;
+    
     public function index(Request $request)
     {
-        $query = StockOpname::select([
-            'opname_id',
-            'product_id',
-            'user_id',
-            'tanggal_opname',
-            'stok_sistem',
-            'stok_fisik',
-            'selisih',
-            'status_penyesuaian',
-            'nama_petugas',
-            'catatan',
-            'created_at'
-        ])->with([
-            'product:product_id,kode_barang,nama_barang,satuan',
-            'user:user_id,name'
-        ]);
+        $cacheKey = 'opnames_' . md5(json_encode($request->all()));
+        
+        $opnames = Cache::remember($cacheKey, self::CACHE_DURATION, function () use ($request) {
+            $query = StockOpname::select([
+                'opname_id',
+                'product_id',
+                'user_id',
+                'tanggal_opname',
+                'stok_sistem',
+                'stok_fisik',
+                'selisih',
+                'status_penyesuaian',
+                'nama_petugas',
+                'catatan',
+                'created_at'
+            ])->with([
+                'product:product_id,kode_barang,nama_barang,satuan',
+                'user:user_id,username'
+            ]);
 
-        if ($request->has('status_penyesuaian')) {
-            $query->where('status_penyesuaian', $request->status_penyesuaian);
-        }
+            if ($request->has('status_penyesuaian')) {
+                $query->where('status_penyesuaian', $request->status_penyesuaian);
+            }
 
-        if ($request->has('start_date') && $request->has('end_date')) {
-            $query->whereBetween('tanggal_opname', [$request->start_date, $request->end_date]);
-        }
+            if ($request->has('start_date') && $request->has('end_date')) {
+                $query->whereBetween('tanggal_opname', [$request->start_date, $request->end_date]);
+            }
 
-        if ($request->has('search')) {
-            $search = $request->search;
-            $query->whereHas('product', function($q) use ($search) {
-                $q->where('nama_barang', 'like', "%{$search}%")
-                  ->orWhere('kode_barang', 'like', "%{$search}%");
-            });
-        }
+            if ($request->has('search')) {
+                $search = $request->search;
+                $query->whereHas('product', function($q) use ($search) {
+                    $q->where('nama_barang', 'like', "%{$search}%")
+                      ->orWhere('kode_barang', 'like', "%{$search}%");
+                });
+            }
 
-        $opnames = $query->latest('tanggal_opname')->paginate($request->per_page ?? 15);
+            return $query->latest('tanggal_opname')->paginate($request->per_page ?? 15);
+        });
 
         return response()->json([
             'success' => true,
-            'data' => $opnames
+            'data' => $opnames,
+            'cached' => Cache::has($cacheKey)
         ]);
     }
 
     public function show($id)
     {
-        $opname = StockOpname::with(['product', 'user'])->find($id);
+        $opname = Cache::remember("opname_{$id}", self::CACHE_DURATION, function () use ($id) {
+            return StockOpname::with(['product', 'user'])->find($id);
+        });
 
         if (!$opname) {
             return response()->json([
@@ -99,7 +108,7 @@ class StockOpnameController extends Controller
             $stokFisik = $request->stok_fisik;
             $selisih = $stokFisik - $stokSistem;
 
-            $userId = Auth::id(); // Get authenticated user ID
+            $userId = Auth::id();
             
             $opname = StockOpname::create([
                 'product_id' => $request->product_id,
@@ -127,7 +136,8 @@ class StockOpnameController extends Controller
             }
 
             DB::commit();
-            Cache::forget("product_{$request->product_id}");
+            
+            $this->clearOpnameCache($request->product_id);
 
             return response()->json([
                 'success' => true,
@@ -137,7 +147,7 @@ class StockOpnameController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Stock opname creation failed: ' . $e->getMessage()); // Fixed
+            Log::error('Stock opname creation failed: ' . $e->getMessage());
             
             return response()->json([
                 'success' => false,
@@ -169,11 +179,14 @@ class StockOpnameController extends Controller
             DB::beginTransaction();
 
             if ($opname->selisih != 0) {
+                $jenisTransaksi = $opname->selisih > 0 ? 'IN' : 'OUT';
+                $jumlahAdjust = abs($opname->selisih);
+                
                 StockTransaction::create([
                     'product_id' => $opname->product_id,
-                    'user_id' => Auth::id() ?? null, // Fixed
-                    'jenis_transaksi' => 'ADJUST',
-                    'jumlah' => $opname->stok_fisik,
+                    'user_id' => Auth::id() ?? null,
+                    'jenis_transaksi' => $jenisTransaksi,
+                    'jumlah' => $jumlahAdjust,
                     'catatan' => "Penyesuaian Stok Opname (Selisih: {$opname->selisih})"
                 ]);
             }
@@ -182,7 +195,8 @@ class StockOpnameController extends Controller
             $opname->save();
 
             DB::commit();
-            Cache::forget("product_{$opname->product_id}");
+            
+            $this->clearOpnameCache($opname->product_id);
 
             return response()->json([
                 'success' => true,
@@ -192,7 +206,7 @@ class StockOpnameController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Stock adjustment failed: ' . $e->getMessage()); // Fixed
+            Log::error('Stock adjustment failed: ' . $e->getMessage());
             
             return response()->json([
                 'success' => false,
@@ -220,7 +234,10 @@ class StockOpnameController extends Controller
             ], 400);
         }
 
+        $productId = $opname->product_id;
         $opname->delete();
+        
+        $this->clearOpnameCache($productId);
 
         return response()->json([
             'success' => true,
@@ -230,19 +247,23 @@ class StockOpnameController extends Controller
 
     public function summary(Request $request)
     {
-        $query = StockOpname::query();
+        $cacheKey = 'opname_summary_' . md5(json_encode($request->all()));
+        
+        $summary = Cache::remember($cacheKey, self::CACHE_DURATION, function () use ($request) {
+            $query = StockOpname::query();
 
-        if ($request->has('start_date') && $request->has('end_date')) {
-            $query->whereBetween('tanggal_opname', [$request->start_date, $request->end_date]);
-        }
+            if ($request->has('start_date') && $request->has('end_date')) {
+                $query->whereBetween('tanggal_opname', [$request->start_date, $request->end_date]);
+            }
 
-        $summary = $query->selectRaw('
-            COUNT(*) as total_opname,
-            SUM(CASE WHEN status_penyesuaian = "Disesuaikan" THEN 1 ELSE 0 END) as disesuaikan,
-            SUM(CASE WHEN status_penyesuaian = "Belum Disesuaikan" THEN 1 ELSE 0 END) as belum_disesuaikan,
-            SUM(CASE WHEN selisih > 0 THEN selisih ELSE 0 END) as total_selisih_positif,
-            SUM(CASE WHEN selisih < 0 THEN selisih ELSE 0 END) as total_selisih_negatif
-        ')->first();
+            return $query->selectRaw('
+                COUNT(*) as total_opname,
+                SUM(CASE WHEN status_penyesuaian = "Disesuaikan" THEN 1 ELSE 0 END) as disesuaikan,
+                SUM(CASE WHEN status_penyesuaian = "Belum Disesuaikan" THEN 1 ELSE 0 END) as belum_disesuaikan,
+                SUM(CASE WHEN selisih > 0 THEN selisih ELSE 0 END) as total_selisih_positif,
+                SUM(CASE WHEN selisih < 0 THEN selisih ELSE 0 END) as total_selisih_negatif
+            ')->first();
+        });
 
         return response()->json([
             'success' => true,
@@ -254,5 +275,16 @@ class StockOpnameController extends Controller
                 'total_selisih_negatif' => $summary->total_selisih_negatif ?? 0,
             ]
         ]);
+    }
+    
+    private function clearOpnameCache($productId = null)
+    {
+        Cache::flush(); 
+        
+        if ($productId) {
+            Cache::forget("product_{$productId}");
+        }
+        
+        Cache::forget('opname_summary_');
     }
 }

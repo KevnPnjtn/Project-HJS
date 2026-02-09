@@ -8,7 +8,8 @@ const BarangMasukAdmin = () => {
   const [formData, setFormData] = useState({
     tanggal_masuk: new Date().toISOString().split('T')[0],
     product_id: '',
-    jumlah_masuk: ''
+    jumlah_masuk: '',
+    penanggung_jawab: ''
   });
   
   const [products, setProducts] = useState([]);
@@ -21,7 +22,7 @@ const BarangMasukAdmin = () => {
   const [filteredTransactions, setFilteredTransactions] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
-  const [initialLoading, setInitialLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [showEditModal, setShowEditModal] = useState(false);
@@ -40,7 +41,10 @@ const BarangMasukAdmin = () => {
 
   const fetchInitialData = async () => {
     try {
-      setInitialLoading(true);
+      if (transactions.length === 0) {
+        setInitialLoading(true);
+      }
+      
       setError('');
       
       const productsResponse = await productapi.getForDropdown();
@@ -161,6 +165,7 @@ const BarangMasukAdmin = () => {
     if (!formData.tanggal_masuk) return setError('Tanggal masuk harus diisi!');
     if (!selectedProduct) return setError('Silakan pilih produk terlebih dahulu!');
     if (!formData.jumlah_masuk || formData.jumlah_masuk <= 0) return setError('Jumlah masuk harus lebih dari 0!');
+    if (!formData.penanggung_jawab.trim()) return setError('Penanggung jawab harus diisi!');
 
     try {
       setLoading(true);
@@ -169,7 +174,8 @@ const BarangMasukAdmin = () => {
         product_id: parseInt(selectedProduct.product_id),
         jenis_transaksi: 'IN',
         jumlah: parseInt(formData.jumlah_masuk),
-        catatan: `Barang masuk - ${selectedProduct.nama_barang}`
+        catatan: `Barang masuk - ${selectedProduct.nama_barang}`,
+        penanggung_jawab: formData.penanggung_jawab
       };
 
       await stockapi.create(dataToSubmit);
@@ -193,7 +199,8 @@ const BarangMasukAdmin = () => {
     setFormData({
       tanggal_masuk: new Date().toISOString().split('T')[0],
       product_id: '',
-      jumlah_masuk: ''
+      jumlah_masuk: '',
+      penanggung_jawab: ''
     });
     setSelectedProduct(null);
     setSearchProduct('');
@@ -218,6 +225,7 @@ const BarangMasukAdmin = () => {
     setEditData({
       transaction_id: transaction.transaction_id,
       jumlah: transaction.jumlah,
+      penanggung_jawab: transaction.penanggung_jawab || '',
       catatan: transaction.catatan || '',
       product_name: transaction.product?.nama_barang || ''
     });
@@ -230,6 +238,7 @@ const BarangMasukAdmin = () => {
       setLoading(true);
       await stockapi.update(editData.transaction_id, {
         jumlah: parseInt(editData.jumlah),
+        penanggung_jawab: editData.penanggung_jawab,
         catatan: editData.catatan
       });
       setSuccess('✓ Transaksi berhasil diupdate!');
@@ -254,6 +263,7 @@ const BarangMasukAdmin = () => {
         'Jenis Barang': transaction.product?.jenis_barang || '-',
         'Satuan': transaction.product?.satuan || '-',
         'Jumlah Masuk': transaction.jumlah || 0,
+        'Penanggung Jawab': transaction.penanggung_jawab || '-',
         'Catatan': transaction.catatan || '-'
       }));
 
@@ -319,10 +329,13 @@ const BarangMasukAdmin = () => {
     });
   };
 
-  if (initialLoading) {
+  if (initialLoading && transactions.length === 0) {
     return (
       <div className="flex items-center justify-center h-96">
-        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600"></div>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Memuat data barang masuk...</p>
+        </div>
       </div>
     );
   }
@@ -480,6 +493,22 @@ const BarangMasukAdmin = () => {
           </div>
         </div>
 
+        {/* Form Row 2 - Penanggung Jawab */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Penanggung Jawab <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={formData.penanggung_jawab}
+              onChange={(e) => setFormData({ ...formData, penanggung_jawab: e.target.value })}
+              placeholder="Nama penanggung jawab"
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 transition-all"
+            />
+          </div>
+        </div>
+
         {/* Product Info Card - Only shown when product is selected */}
         {selectedProduct && (
           <div className="mb-4 p-5 bg-gradient-to-r from-blue-50 to-blue-100 border-2 border-blue-300 rounded-xl shadow-md">
@@ -574,6 +603,7 @@ const BarangMasukAdmin = () => {
                 <th className="text-left py-4 px-6 text-sm font-semibold">Nama Barang</th>
                 <th className="text-left py-4 px-6 text-sm font-semibold">Jenis</th>
                 <th className="text-left py-4 px-6 text-sm font-semibold">Satuan</th>
+                <th className="text-left py-4 px-6 text-sm font-semibold">Penanggung Jawab</th>
                 <th className="text-center py-4 px-6 text-sm font-semibold">Jumlah</th>
                 <th className="text-center py-4 px-6 text-sm font-semibold">Aksi</th>
               </tr>
@@ -606,6 +636,9 @@ const BarangMasukAdmin = () => {
                     </td>
                     <td className="py-4 px-6 text-sm text-gray-700">
                       {transaction.product?.satuan || '-'}
+                    </td>
+                    <td className="py-4 px-6 text-sm text-gray-700">
+                      {transaction.penanggung_jawab || '-'}
                     </td>
                     <td className="py-4 px-6 text-center">
                       <span className="inline-block px-3 py-1 bg-blue-100 text-blue-700 rounded-full font-semibold text-sm">
@@ -728,6 +761,15 @@ const BarangMasukAdmin = () => {
                   onChange={(e) => setEditData({ ...editData, jumlah: e.target.value })}
                   min="1"
                   className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Penanggung Jawab</label>
+                <input
+                  type="text"
+                  value={editData.penanggung_jawab}
+                  onChange={(e) => setEditData({ ...editData, penanggung_jawab: e.target.value })}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 transition-all"
                 />
               </div>
               <div>

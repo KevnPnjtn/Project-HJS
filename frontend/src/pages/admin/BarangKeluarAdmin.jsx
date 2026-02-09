@@ -21,7 +21,7 @@ const BarangKeluarAdmin = () => {
   const [filteredTransactions, setFilteredTransactions] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
-  const [initialLoading, setInitialLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const dropdownRef = useRef(null);
@@ -44,65 +44,68 @@ const BarangKeluarAdmin = () => {
   }, [pagination.currentPage]);
 
   const fetchInitialData = async () => {
-    try {
-      setInitialLoading(true);
-      setError('');
-      
-      const productsResponse = await productapi.getForDropdown();
-      
-      let allProducts = [];
-      if (productsResponse?.data?.data && Array.isArray(productsResponse.data.data)) {
-        allProducts = productsResponse.data.data;
-      } else if (productsResponse?.data && Array.isArray(productsResponse.data)) {
-        allProducts = productsResponse.data;
-      }
-      
-      setProducts(allProducts);
-      setFilteredProducts(allProducts);
-      
-      const transactionsResponse = await stockapi.getAll({ 
-        jenis_transaksi: 'OUT',
-        page: pagination.currentPage,
-        limit: pagination.perPage
-      });
-
-      const responseData = transactionsResponse.data;
-      const transactionsData = responseData?.data || [];
-      const paginationInfo = responseData?.pagination || {};
-      
-      const enrichedTransactions = transactionsData.map(transaction => {
-        const fullProduct = allProducts.find(p => p.product_id === transaction.product_id);
-        if (fullProduct) {
-          return {
-            ...transaction,
-            product: {
-              ...transaction.product,
-              kode_barang: fullProduct.kode_barang || transaction.product?.kode_barang,
-              nama_barang: fullProduct.nama_barang || transaction.product?.nama_barang,
-              jenis_barang: fullProduct.jenis_barang || transaction.product?.jenis_barang || '-',
-              satuan: fullProduct.satuan || transaction.product?.satuan || '-',
-              stok: fullProduct.stok || transaction.product?.stok || 0
-            }
-          };
+      try {
+        if (transactions.length === 0) {
+          setInitialLoading(true);
         }
-        return transaction;
-      });
-      
-      setTransactions(enrichedTransactions);
-      setFilteredTransactions(enrichedTransactions);
-
-      setPagination(prev => ({
-        ...prev,
-        totalPages: paginationInfo.total_pages || Math.ceil((paginationInfo.total || enrichedTransactions.length) / prev.perPage),
-        totalItems: paginationInfo.total || enrichedTransactions.length
-      }));
-
-    } catch (err) {
-      setError(err.response?.data?.message || 'Gagal memuat data. Silakan refresh halaman.');
-    } finally {
-      setInitialLoading(false);
-    }
-  };
+        
+        setError('');
+        
+        const productsResponse = await productapi.getForDropdown();
+        
+        let allProducts = [];
+        if (productsResponse?.data?.data && Array.isArray(productsResponse.data.data)) {
+          allProducts = productsResponse.data.data;
+        } else if (productsResponse?.data && Array.isArray(productsResponse.data)) {
+          allProducts = productsResponse.data;
+        }
+        
+        setProducts(allProducts);
+        setFilteredProducts(allProducts);
+  
+        const transactionsResponse = await stockapi.getAll({ 
+          jenis_transaksi: 'OUT',
+          page: pagination.currentPage,
+          limit: pagination.perPage
+        });
+  
+        const responseData = transactionsResponse.data;
+        const transactionsData = responseData?.data || [];
+        const paginationInfo = responseData?.pagination || {};
+        
+        const enrichedTransactions = transactionsData.map(transaction => {
+          const fullProduct = allProducts.find(p => p.product_id === transaction.product_id);
+          if (fullProduct) {
+            return {
+              ...transaction,
+              product: {
+                ...transaction.product,
+                kode_barang: fullProduct.kode_barang || transaction.product?.kode_barang,
+                nama_barang: fullProduct.nama_barang || transaction.product?.nama_barang,
+                jenis_barang: fullProduct.jenis_barang || transaction.product?.jenis_barang || '-',
+                satuan: fullProduct.satuan || transaction.product?.satuan || '-',
+                stok: fullProduct.stok || transaction.product?.stok || 0
+              }
+            };
+          }
+          return transaction;
+        });
+        
+        setTransactions(enrichedTransactions);
+        setFilteredTransactions(enrichedTransactions);
+  
+        setPagination(prev => ({
+          ...prev,
+          totalPages: paginationInfo.total_pages || Math.ceil((paginationInfo.total || enrichedTransactions.length) / prev.perPage),
+          totalItems: paginationInfo.total || enrichedTransactions.length
+        }));
+  
+      } catch (err) {
+        setError(err.response?.data?.message || 'Gagal memuat data. Silakan refresh halaman.');
+      } finally {
+        setInitialLoading(false);
+      }
+    };
 
   useEffect(() => {
     if (!searchProduct.trim()) {
@@ -359,10 +362,13 @@ const BarangKeluarAdmin = () => {
     return date.toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' });
   };
 
-  if (initialLoading) {
+  if (initialLoading && transactions.length === 0) {
     return (
       <div className="flex items-center justify-center h-96">
-        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-red-600"></div>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Memuat data barang keluar...</p>
+        </div>
       </div>
     );
   }

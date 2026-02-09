@@ -58,32 +58,30 @@ const StokOpnameAdmin = () => {
 
   const fetchProducts = async () => {
     try {
+      setLoading(true);
       const response = await productapi.getForDropdown();
-      let productList = [];
-      if (response.data?.data) {
-        productList = response.data.data;
-      } else if (response.data) {
-        productList = response.data;
-      } else if (Array.isArray(response)) {
-        productList = response;
-      }
-      setProducts(productList);
-      setFilteredProducts(productList);
+      setProducts(response.data?.data || []);
     } catch (err) {
-      console.error('Error fetching products:', err);
+      console.error('Error:', err);
+      setError('Gagal memuat produk');
+    } finally {
+      setLoading(false);
     }
   };
 
   const fetchOpnames = async () => {
     try {
+      setLoading(true);
       const response = await stockopnameapi.getAll();
-      const allOpnames = response.data?.data || [];
-      setOpnames(allOpnames);
-      setFilteredOpnames(allOpnames);
+      setOpnames(response.data?.data || []);
     } catch (err) {
-      console.error('Error fetching opnames:', err);
+      console.error('Error:', err);
+      setError('Gagal memuat opname');
+    } finally {
+      setLoading(false);
     }
   };
+
 
   const filterProductDropdown = () => {
     if (!searchProduct.trim()) {
@@ -147,19 +145,16 @@ const StokOpnameAdmin = () => {
     setError('');
     setSuccess('');
 
-    if (!formData.tanggal_opname) return setError('Tanggal opname harus diisi!');
-    if (!selectedProduct) return setError('Silakan pilih produk terlebih dahulu!');
-    if (formData.stok_fisik === '' || formData.stok_fisik < 0) return setError('Stok fisik harus diisi dengan nilai valid!');
+    if (!formData.tanggal_opname) return setError('Tanggal harus diisi!');
+    if (!selectedProduct) return setError('Pilih produk!');
+    if (formData.stok_fisik === '') return setError('Stok fisik harus diisi!');
 
     try {
       setLoading(true);
-      const freshProductResponse = await productapi.getById(selectedProduct.product_id);
-      const freshProduct = freshProductResponse.data || freshProductResponse;
-      setSelectedProduct(freshProduct);
       
       const dataToSubmit = {
-        product_id: parseInt(freshProduct.product_id),
-        tanggal_opname: formData.tanggal_opname, 
+        product_id: parseInt(selectedProduct.product_id),
+        tanggal_opname: formData.tanggal_opname,
         stok_fisik: parseInt(formData.stok_fisik),
         nama_petugas: formData.nama_petugas || null,
         catatan: formData.catatan || null,
@@ -168,60 +163,56 @@ const StokOpnameAdmin = () => {
 
       await stockopnameapi.create(dataToSubmit);
       
-      const message = formData.sesuaikan_stok 
-        ? 'Stok opname berhasil disimpan dan disesuaikan dengan sistem!' 
-        : 'Stok opname berhasil disimpan!';
-      
-      setSuccess(message);
+      setSuccess('✅ Stok opname berhasil disimpan!');
       
       setTimeout(() => {
         handleReset();
-        fetchOpnames();
-        fetchProducts();
-      }, 1500);
+        fetchOpnames(); 
+        fetchProducts(); 
+      }, 1000);
 
     } catch (err) {
-      console.error('Error saving opname:', err);
-      let errorMessage = 'Gagal menyimpan stok opname';
-      if (err.response?.status === 422) {
-        const validationErrors = err.response?.data?.errors || {};
-        const errorMessages = Object.entries(validationErrors)
-          .map(([field, messages]) => `${field}: ${Array.isArray(messages) ? messages.join(', ') : messages}`)
-          .join(' | ');
-        errorMessage = `Validasi gagal: ${errorMessages}`;
-      } else if (err.response?.data?.message) {
-        errorMessage = err.response.data.message;
-      }
-      setError(errorMessage);
+      console.error('Error:', err);
+      setError(err.response?.data?.message || 'Gagal menyimpan');
     } finally {
       setLoading(false);
     }
   };
 
   const handleAdjustStock = async (opnameId) => {
-    if (!window.confirm('Apakah Anda yakin ingin menyesuaikan stok dengan hasil opname ini?')) return;
+    if (!window.confirm('Yakin mau sesuaikan stok?')) return;
 
     try {
+      setLoading(true);
       await stockopnameapi.adjustStock(opnameId);
-      setSuccess('Stok berhasil disesuaikan!');
+      setSuccess('✅ Stok berhasil disesuaikan!');
+      
       fetchOpnames();
       fetchProducts();
+      
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
-      setError(`Gagal menyesuaikan stok: ${err.response?.data?.message || err.message}`);
+      setError(err.response?.data?.message || 'Gagal sesuaikan stok');
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Apakah Anda yakin ingin menghapus data opname ini?')) {
-      try {
-        await stockopnameapi.delete(id);
-        setSuccess('Data opname berhasil dihapus!');
-        fetchOpnames();
-        setTimeout(() => setSuccess(''), 3000);
-      } catch (err) {
-        setError(`Gagal menghapus data: ${err.response?.data?.message || err.message}`);
-      }
+    if (!window.confirm('Yakin hapus?')) return;
+
+    try {
+      setLoading(true);
+      await stockopnameapi.delete(id);
+      setSuccess('✅ Data berhasil dihapus!');
+      
+      fetchOpnames();
+      
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Gagal hapus');
+    } finally {
+      setLoading(false);
     }
   };
 
