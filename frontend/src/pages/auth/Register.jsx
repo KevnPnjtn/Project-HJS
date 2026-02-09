@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, Eye, EyeOff, Mail, Lock, User, AlertCircle, CheckCircle, ShieldCheck, Loader2 } from "lucide-react";
 import { register } from "../../services/auth";
@@ -56,7 +56,9 @@ const Register = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
-  const [successCountdown, setSuccessCountdown] = useState(0);
+  
+  const emailSentRef = useRef(false);
+  const [registeredEmail, setRegisteredEmail] = useState("");
 
   const [formData, setFormData] = useState({
     username: "",
@@ -98,6 +100,12 @@ const Register = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    if (loading || emailSentRef.current) {
+      console.log('⚠️ Prevented double submission');
+      return;
+    }
+    
     setError("");
     setSuccess(false);
 
@@ -115,19 +123,12 @@ const Register = () => {
 
       await register(registerData);
       
+      emailSentRef.current = true;
+      
+      setRegisteredEmail(formData.email.trim());
+      
       setSuccess(true);
-      setSuccessCountdown(3);
       setFormData({ username: "", email: "", password: "", confirmPassword: "", terms: false });
-
-      const interval = setInterval(() => {
-        setSuccessCountdown((prev) => {
-          if (prev <= 1) {
-            clearInterval(interval);
-            navigate('/login');
-          }
-          return prev - 1;
-        });
-      }, 1000);
 
     } catch (err) {
       console.error("Error registrasi:", err);
@@ -147,46 +148,108 @@ const Register = () => {
     }
   };
 
+  const handleGoToLogin = () => {
+    navigate('/login');
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">
       
-      {/* Modal Sukses */}
+      {/**/}
       {success && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 px-4 animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full text-center transform transition-all scale-100">
-            <div className="flex justify-center mb-6">
-              <div className="bg-green-50 p-4 rounded-full">
-                <div className="bg-green-100 p-3 rounded-full">
-                  <ShieldCheck className="w-12 h-12 text-green-600" />
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden transform transition-all scale-100">
+            
+            {/* Green Header */}
+            <div className="bg-gradient-to-r from-green-400 to-emerald-500 p-8 text-center">
+              <div className="flex justify-center mb-4">
+                <div className="bg-white rounded-full p-4 shadow-lg animate-bounce">
+                  <ShieldCheck className="w-12 h-12 text-green-500" />
                 </div>
               </div>
+              <h3 className="text-2xl font-bold text-white mb-2">
+                🎉 Registrasi Berhasil!
+              </h3>
+              <p className="text-green-50 text-sm">
+                Tinggal satu langkah lagi
+              </p>
             </div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-2">Akun Dibuat!</h3>
-            <p className="text-gray-600 mb-6 text-sm">
-              Registrasi berhasil. Silakan cek email Anda untuk verifikasi akun sebelum login.
-            </p>
-            <div className="mb-6 flex items-center justify-center gap-2 text-sm font-medium text-gray-500">
-              <span>Mengalihkan otomatis dalam</span>
-              <span className="bg-blue-100 text-blue-700 w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold">
-                {successCountdown}
-              </span>
+
+            {/* Content */}
+            <div className="p-8">
+              
+              {/* Email Info Box */}
+              <div className="bg-blue-50 border-l-4 border-blue-500 rounded-lg p-4 mb-4">
+                <div className="flex items-start">
+                  <Mail className="w-5 h-5 text-blue-500 mr-3 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm text-blue-900 font-semibold mb-1">
+                      📧 Email verifikasi telah dikirim ke:
+                    </p>
+                    <p className="text-sm text-blue-800 font-mono bg-blue-100 px-3 py-1.5 rounded mt-2 break-all">
+                      {registeredEmail}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Steps Box */}
+              <div className="bg-yellow-50 border-l-4 border-yellow-500 rounded-lg p-4 mb-4">
+                <p className="text-sm text-yellow-900 font-semibold mb-3 flex items-center">
+                  <span className="text-lg mr-2">📋</span>
+                  Langkah Selanjutnya:
+                </p>
+                <ol className="text-sm text-yellow-800 space-y-2">
+                  <li className="flex items-start">
+                    <span className="bg-yellow-200 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold mr-2 flex-shrink-0">1</span>
+                    <span>Buka inbox email Anda</span>
+                  </li>
+                  <li className="flex items-start">
+                    <span className="bg-yellow-200 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold mr-2 flex-shrink-0">2</span>
+                    <span>Cari email dari <strong>"Inventory System"</strong></span>
+                  </li>
+                  <li className="flex items-start">
+                    <span className="bg-yellow-200 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold mr-2 flex-shrink-0">3</span>
+                    <span>Klik tombol <strong>"Verifikasi Email Saya"</strong></span>
+                  </li>
+                  <li className="flex items-start">
+                    <span className="bg-yellow-200 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold mr-2 flex-shrink-0">4</span>
+                    <span>Kembali ke halaman login</span>
+                  </li>
+                </ol>
+              </div>
+
+              {/* Tips Box */}
+              <div className="bg-purple-50 rounded-lg p-4 mb-6">
+                <p className="text-xs text-purple-800 text-center">
+                  💡 <strong>Tidak menerima email?</strong> Cek folder <strong>Spam/Junk</strong> Anda
+                </p>
+              </div>
+
+              {/* Button */}
+              <button
+                onClick={handleGoToLogin}
+                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-3.5 rounded-xl font-bold hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
+              >
+                <CheckCircle className="w-5 h-5" />
+                Mengerti, ke Halaman Login
+              </button>
+
+              {/* Footer Info */}
+              <p className="text-center text-xs text-gray-500 mt-4">
+                Link verifikasi berlaku selama 60 menit
+              </p>
             </div>
-            <button
-              onClick={() => navigate('/login')}
-              className="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold hover:bg-blue-700 transition-all"
-            >
-              Login Sekarang
-            </button>
           </div>
         </div>
       )}
 
       {/* Main Card */}
-      <div className="max-w-md w-full">
+      <div className={`max-w-md w-full ${success ? 'opacity-50 pointer-events-none' : ''}`}>
         
         <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
           
-          {/* Navigasi Back di DALAM card */}
+          {/* Navigasi Back */}
           <div className="mb-6">
             <Link to="/login" className="inline-flex items-center gap-2 text-gray-500 hover:text-gray-900 transition-colors group">
                 <ArrowLeft className="w-6 h-6 group-hover:-translate-x-1 transition-transform" /> 
@@ -322,7 +385,7 @@ const Register = () => {
               </div>
             </div>
 
-            {/* ✅ TOMBOL SUBMIT - FIXED SIZE & IMPROVED UX */}
+            {/* Submit Button */}
             <button
               type="submit"
               disabled={loading || !formData.terms}

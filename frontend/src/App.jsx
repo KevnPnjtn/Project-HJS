@@ -23,7 +23,7 @@ function App() {
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/email-verification" element={<EmailVerification />} />
-        <Route path="/verify-email/:id" element={<VerifyEmail />} />
+        <Route path="/verify-email/:id/:hash" element={<VerifyEmail />} />
         
         {/* Protected routes */}
         <Route 

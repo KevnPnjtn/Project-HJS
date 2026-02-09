@@ -14,7 +14,6 @@ class VerifyEmail extends VerifyEmailBase
     {
         $verificationUrl = $this->verificationUrl($notifiable);
         
-        // ✅ Pass email sebagai parameter
         $html = $this->getEmailHtml($notifiable->username, $notifiable->email, $verificationUrl);
 
         $message = new MailMessage();
@@ -28,7 +27,7 @@ class VerifyEmail extends VerifyEmailBase
     {
         $frontendUrl = config('app.frontend_url', 'http://localhost:5173');
         
-        $url = URL::temporarySignedRoute(
+        $backendUrl = URL::temporarySignedRoute(
             'verification.verify',
             Carbon::now()->addMinutes(60),
             [
@@ -37,14 +36,20 @@ class VerifyEmail extends VerifyEmailBase
             ]
         );
 
-        return str_replace(
-            config('app.url'),
-            $frontendUrl . '/verify-email',
-            $url
-        );
+        $parsed = parse_url($backendUrl);
+        $queryString = isset($parsed['query']) ? $parsed['query'] : '';
+        
+        $frontendVerifyUrl = $frontendUrl . '/verify-email/' 
+            . $notifiable->getKey() . '/' 
+            . sha1($notifiable->getEmailForVerification());
+        
+        if ($queryString) {
+            $frontendVerifyUrl .= '?' . $queryString;
+        }
+        
+        return $frontendVerifyUrl;
     }
 
-    // ✅ Tambahkan parameter $email
     protected function getEmailHtml($username, $email, $verificationUrl)
     {
         $year = date('Y');
@@ -95,7 +100,7 @@ class VerifyEmail extends VerifyEmailBase
             
             <!-- CTA Button -->
             <div style="text-align: center; margin: 35px 0;">
-                <a href="{$verificationUrl}" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 18px 60px; text-decoration: none; border-radius: 12px; font-weight: 700; font-size: 17px; box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4); transition: transform 0.2s;">
+                <a href="{$verificationUrl}" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 18px 60px; text-decoration: none; border-radius: 12px; font-weight: 700; font-size: 17px; box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);">
                     ✓ Verifikasi Email Saya
                 </a>
                 <p style="font-size: 13px; color: #718096; margin: 15px 0 0 0;">

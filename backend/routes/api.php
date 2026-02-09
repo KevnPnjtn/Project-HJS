@@ -5,142 +5,118 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\URL;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\StockTransactionController;
 use App\Http\Controllers\StockOpnameController;
 use App\Http\Controllers\ProfitReportController;
 use App\Http\Controllers\ProductQrLogController;
-use App\Http\Controllers\VerifyEmailController;
-
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
 Route::post('/reset-password', [AuthController::class, 'resetPassword']);
-Route::post('/resend-verification', [AuthController::class, 'resendVerification']);
-Route::get('/email/verify/{id}/{hash}', [VerifyEmailController::class, 'verify'])
-    ->name('verification.verify');
 
 Route::get('/email/verify/{id}/{hash}', function (Request $request, $id, $hash) {
     Log::info('=== EMAIL VERIFICATION ATTEMPT ===', [
         'user_id' => $id,
         'hash' => $hash,
-        'url' => $request->fullUrl()
+        'expires' => $request->query('expires'),
+        'signature' => $request->query('signature'),
+        'url' => $request->fullUrl(),
+        'method' => $request->method(),
+        'headers' => $request->headers->all()
     ]);
 
     try {
-        $user = User::where('user_id', $id)->first();
-
-        if (!$user) {
-            Log::error('User not found', ['user_id' => $id]);
+        // Validate signature first
+        if (!URL::hasValidSignature($request)) {
+            Log::error('❌ Invalid signature or expired');
             return response()->json([
                 'status' => 'error',
-                'message' => 'User not found'
+                'message' => 'Link verifikasi tidak valid atau sudah kedaluwarsa.',
+                'expired' => true
+            ], 403);
+        }
+
+        // Find user
+        $user = User::where('user_id', $id)->first();
+        
+        if (!$user) {
+            Log::error('❌ User not found', ['user_id' => $id]);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'User tidak ditemukan.'
             ], 404);
         }
 
-        Log::info('User found', [
+        Log::info('✓ User found', [
             'user_id' => $user->user_id,
             'email' => $user->email,
-            'verified' => $user->hasVerifiedEmail()
+            'already_verified' => $user->hasVerifiedEmail()
         ]);
 
+        // Verify hash
         $expectedHash = sha1($user->getEmailForVerification());
         if (!hash_equals($expectedHash, (string) $hash)) {
-            Log::error('Invalid hash', [
+            Log::error('❌ Hash mismatch', [
                 'expected' => $expectedHash,
                 'received' => $hash
             ]);
             return response()->json([
                 'status' => 'error',
-                'message' => 'Invalid verification link'
-            ], 400);
+                'message' => 'Link verifikasi tidak valid.'
+            ], 403);
         }
 
-        if (!URL::hasValidSignature($request)) {
-            Log::error('Invalid signature');
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Verification link has expired or is invalid'
-            ], 400);
-        }
-
+        // Check if already verified
         if ($user->hasVerifiedEmail()) {
-            Log::info('Email already verified');
+            Log::info('ℹ️ Email already verified');
             return response()->json([
                 'status' => 'success',
-                'message' => 'Email already verified'
+                'message' => 'Email sudah diverifikasi sebelumnya.',
+                'already_verified' => true
             ], 200);
         }
 
+        // Mark as verified
         $user->markEmailAsVerified();
-        Log::info('Email verified successfully', ['user_id' => $user->user_id]);
+        event(new \Illuminate\Auth\Events\Verified($user));
+        
+        // Force refresh from database
+        $user = $user->fresh();
+        
+        Log::info('✅ Email verified successfully', [
+            'user_id' => $user->user_id,
+            'email' => $user->email,
+            'verified_at' => $user->email_verified_at,
+            'verified_at_timestamp' => $user->email_verified_at ? $user->email_verified_at->timestamp : null
+        ]);
 
         return response()->json([
             'status' => 'success',
-            'message' => 'Email verified successfully!'
+            'message' => 'Email berhasil diverifikasi!',
+            'already_verified' => false,
+            'verified_at' => $user->email_verified_at
         ], 200);
 
     } catch (\Exception $e) {
-        Log::error('Email verification error', [
+        Log::error('❌ Email verification error', [
             'message' => $e->getMessage(),
             'file' => $e->getFile(),
-            'line' => $e->getLine()
+            'line' => $e->getLine(),
+            'trace' => $e->getTraceAsString()
         ]);
 
         return response()->json([
             'status' => 'error',
-            'message' => 'Verification failed: ' . $e->getMessage()
+            'message' => 'Terjadi kesalahan saat verifikasi: ' . $e->getMessage()
         ], 500);
     }
 })->name('verification.verify');
 
-Route::post('/email/resend', function (Request $request) {
-    $request->validate(['email' => 'required|email']);
-
-    $user = User::where('email', $request->email)->first();
-
-    if (!$user) {
-        return response()->json([
-            'status' => 'error',
-            'message' => 'User not found'
-        ], 404);
-    }
-
-    if ($user->hasVerifiedEmail()) {
-        return response()->json([
-            'status' => 'error',
-            'message' => 'Email already verified'
-        ], 400);
-    }
-
-    $verificationUrl = URL::temporarySignedRoute(
-        'verification.verify',
-        now()->addMinutes(60),
-        [
-            'id' => $user->user_id,
-            'hash' => sha1($user->email),
-        ]
-    );
-
-    Log::info('Resending verification email', [
-        'user_id' => $user->user_id,
-        'email' => $user->email,
-        'url' => $verificationUrl
-    ]);
-
-    Mail::to($user->email)->send(new \App\Mail\VerifyEmail($verificationUrl));
-
-    return response()->json([
-        'status' => 'success',
-        'message' => 'Verification link resent!'
-    ], 200);
-});
-
+Route::post('/email/resend', [AuthController::class, 'resendVerification']);
 Route::prefix('dev')->group(function () {
-    // Products
     Route::get('/products', [ProductController::class, 'index']);
     Route::get('/products/dropdown/list', [ProductController::class, 'getForDropdown']);
     Route::get('/products/{id}', [ProductController::class, 'show']);
@@ -149,7 +125,6 @@ Route::prefix('dev')->group(function () {
     Route::delete('/products/{id}', [ProductController::class, 'destroy']);
     Route::post('/products/scan-qr', [ProductController::class, 'scanQrCode']);
 
-    // Stock Transactions
     Route::get('/stock-transactions', [StockTransactionController::class, 'index']);
     Route::get('/stock-transactions/{id}', [StockTransactionController::class, 'show']);
     Route::post('/stock-transactions', [StockTransactionController::class, 'store']);
@@ -159,7 +134,6 @@ Route::prefix('dev')->group(function () {
     Route::delete('/stock-transactions/{id}', [StockTransactionController::class, 'destroy']);
     Route::get('/stock-transactions/kartu-stok/{productId}', [StockTransactionController::class, 'getKartuStok']);
     
-    // Stock Opname Routes
     Route::get('/stock-opnames', [StockOpnameController::class, 'index']);
     Route::get('/stock-opnames/{id}', [StockOpnameController::class, 'show']);
     Route::post('/stock-opnames', [StockOpnameController::class, 'store']);
@@ -167,7 +141,6 @@ Route::prefix('dev')->group(function () {
     Route::delete('/stock-opnames/{id}', [StockOpnameController::class, 'destroy']);
     Route::get('/stock-opnames/summary/all', [StockOpnameController::class, 'summary']);
     
-    // Profit Reports
     Route::get('/profit-reports', [ProfitReportController::class, 'index']);
     Route::get('/profit-reports/{id}', [ProfitReportController::class, 'show']);
     Route::post('/profit-reports/generate', [ProfitReportController::class, 'generate']);
@@ -176,20 +149,17 @@ Route::prefix('dev')->group(function () {
     Route::post('/profit-reports/generate/monthly', [ProfitReportController::class, 'generateMonthly']);
     Route::get('/profit-reports/summary/all', [ProfitReportController::class, 'summary']);
 
-    // QR Logs
     Route::get('/qr-logs', [ProductQrLogController::class, 'index']);
     Route::get('/qr-logs/{id}', [ProductQrLogController::class, 'show']);
     Route::get('/qr-logs/product/{productId}', [ProductQrLogController::class, 'getByProduct']);
     Route::get('/qr-logs/statistics/all', [ProductQrLogController::class, 'statistics']);
 });
 
+
 Route::middleware('auth:sanctum')->group(function () {
-    
-    // Auth Routes
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', fn(Request $request) => $request->user());
 
-    // Products Routes
     Route::prefix('products')->group(function () {
         Route::get('/', [ProductController::class, 'index']);
         Route::get('/dropdown/list', [ProductController::class, 'getForDropdown']);
@@ -200,7 +170,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/scan-qr', [ProductController::class, 'scanQrCode']);
     });
 
-    // Stock Transactions Routes
     Route::prefix('stock-transactions')->group(function () {
         Route::get('/', [StockTransactionController::class, 'index']);
         Route::get('/{id}', [StockTransactionController::class, 'show']);
@@ -209,7 +178,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/summary/all', [StockTransactionController::class, 'summary']);
     });
 
-    // Stock Opname Routes
     Route::prefix('stock-opnames')->group(function () {
         Route::get('/', [StockOpnameController::class, 'index']);
         Route::get('/{id}', [StockOpnameController::class, 'show']);
@@ -219,7 +187,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/summary/all', [StockOpnameController::class, 'summary']);
     });
 
-    // Profit Reports Routes
     Route::prefix('profit-reports')->group(function () {
         Route::get('/', [ProfitReportController::class, 'index']);
         Route::get('/{id}', [ProfitReportController::class, 'show']);
@@ -231,7 +198,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/summary/all', [ProfitReportController::class, 'summary']);
     });
 
-    // QR Logs Routes
     Route::prefix('qr-logs')->group(function () {
         Route::get('/', [ProductQrLogController::class, 'index']);
         Route::get('/statistics', [ProductQrLogController::class, 'statistics']);
@@ -240,7 +206,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/{id}', [ProductQrLogController::class, 'destroy']);
     });
 
-    // Admin Only Routes
     Route::middleware('admin')->group(function () {
         Route::get('/admin', fn() => response()->json(['message' => 'Admin access granted']));
     });

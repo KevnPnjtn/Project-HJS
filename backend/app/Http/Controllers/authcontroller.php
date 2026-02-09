@@ -56,7 +56,6 @@ class AuthController extends Controller
 
             DB::commit();
             
-            // ✅ Send verification email (fire once)
             try {
                 set_time_limit(15);
                 event(new Registered($user));
