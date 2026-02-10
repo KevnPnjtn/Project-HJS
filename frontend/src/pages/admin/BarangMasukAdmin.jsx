@@ -62,12 +62,17 @@ const BarangMasukAdmin = () => {
       const transactionsResponse = await stockapi.getAll({ 
         jenis_transaksi: 'IN',
         page: pagination.currentPage,
-        limit: pagination.perPage
+        per_page: pagination.perPage
       });
 
       const responseData = transactionsResponse.data;
       const transactionsData = responseData?.data || [];
-      const paginationInfo = responseData?.pagination || {};
+      const paginationInfo = {
+        total: responseData.total || responseData.pagination?.total,
+        total_pages: responseData.last_page || responseData.pagination?.total_pages,
+        current_page: responseData.current_page || responseData.pagination?.current_page,
+        per_page: responseData.per_page || responseData.pagination?.per_page
+      };  
       
       const enrichedTransactions = transactionsData.map(transaction => {
         const fullProduct = allProducts.find(p => p.product_id === transaction.product_id);
@@ -611,7 +616,7 @@ const BarangMasukAdmin = () => {
             <tbody>
               {filteredTransactions.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="text-center py-12 text-gray-500">
+                  <td colSpan="8" className="text-center py-12 text-gray-500">
                     <Package className="w-16 h-16 mx-auto mb-4 text-gray-300" />
                     <p className="text-lg font-medium">Belum ada transaksi barang masuk</p>
                   </td>
@@ -670,7 +675,7 @@ const BarangMasukAdmin = () => {
           </table>
         </div>
 
-        {filteredTransactions.length > 0 && (
+        {!loading && filteredTransactions.length > 0 && (
           <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
             <div className="flex items-center justify-between">
               <p className="text-sm text-gray-600">
@@ -678,54 +683,53 @@ const BarangMasukAdmin = () => {
                 {pagination.totalPages > 1 && ` (Halaman ${pagination.currentPage} dari ${pagination.totalPages})`}
               </p>
               
-              {pagination.totalPages > 1 && (
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setPagination(prev => ({ ...prev, currentPage: prev.currentPage - 1 }))}
-                    disabled={pagination.currentPage === 1}
-                    className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                  >
-                    ← Prev
-                  </button>
-                  
-                  <div className="flex gap-1">
-                    {Array.from({ length: Math.min(pagination.totalPages, 5) }, (_, i) => {
-                      let pageNum;
-                      if (pagination.totalPages <= 5) {
-                        pageNum = i + 1;
-                      } else if (pagination.currentPage <= 3) {
-                        pageNum = i + 1;
-                      } else if (pagination.currentPage >= pagination.totalPages - 2) {
-                        pageNum = pagination.totalPages - 4 + i;
-                      } else {
-                        pageNum = pagination.currentPage - 2 + i;
-                      }
-                      
-                      return (
-                        <button
-                          key={pageNum}
-                          onClick={() => setPagination(prev => ({ ...prev, currentPage: pageNum }))}
-                          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                            pagination.currentPage === pageNum
-                              ? 'bg-blue-600 text-white shadow-md'
-                              : 'border border-gray-300 hover:bg-gray-100'
-                          }`}
-                        >
-                          {pageNum}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  
-                  <button
-                    onClick={() => setPagination(prev => ({ ...prev, currentPage: prev.currentPage + 1 }))}
-                    disabled={pagination.currentPage === pagination.totalPages}
-                    className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                  >
-                    Next →
-                  </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setPagination(prev => ({ ...prev, currentPage: prev.currentPage - 1 }))}
+                  disabled={pagination.currentPage === 1}
+                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                >
+                  ← Prev
+                </button>
+                
+                <div className="flex gap-1">
+                  {Array.from({ length: Math.min(Math.max(pagination.totalPages, 1), 5) }, (_, i) => {
+                    let pageNum;
+                    const totalPages = Math.max(pagination.totalPages, 1);
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (pagination.currentPage <= 3) {
+                      pageNum = i + 1;
+                    } else if (pagination.currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = pagination.currentPage - 2 + i;
+                    }
+                    
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => setPagination(prev => ({ ...prev, currentPage: pageNum }))}
+                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                          pagination.currentPage === pageNum
+                            ? 'bg-blue-600 text-white shadow-md'
+                            : 'border border-gray-300 hover:bg-gray-100'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
                 </div>
-              )}
+                
+                <button
+                  onClick={() => setPagination(prev => ({ ...prev, currentPage: prev.currentPage + 1 }))}
+                  disabled={pagination.currentPage === pagination.totalPages}
+                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                >
+                  Next →
+                </button>
+              </div>
             </div>
           </div>
         )}
