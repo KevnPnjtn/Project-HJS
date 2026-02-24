@@ -158,9 +158,9 @@ const LaporanProfitAdmin = () => {
         'Qty': item.jumlah,
         'Harga Modal': item.hargaModal,
         'Harga Jual': item.hargaJual,
-        'Total Modal': item.totalModal,
-        'Total Penjualan': item.totalPenjualan,
-        'Profit': item.profit
+        'HPP': item.totalModal,
+        'Omset': item.totalPenjualan,
+        'Laba': item.profit
       }));
  
       exportData.push({
@@ -249,10 +249,10 @@ const LaporanProfitAdmin = () => {
         }
       }
 
-      XLSX.utils.book_append_sheet(wb, ws, "Laporan Profit");
+      XLSX.utils.book_append_sheet(wb, ws, "Laporan Laba Rugi");
       
       const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
-      XLSX.writeFile(wb, `Laporan_Profit_${timestamp}.xlsx`);
+      XLSX.writeFile(wb, `Laporan_Laba_Rugi_${timestamp}.xlsx`);
 
     } catch (error) {
       console.error('Error exporting:', error);
@@ -303,62 +303,67 @@ const LaporanProfitAdmin = () => {
     <div className="space-y-6">
       {/* Header */}
       <div className="bg-gradient-to-r from-green-600 to-emerald-600 rounded-xl shadow-lg p-6 text-white">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold mb-2">Laporan Profit</h1>
-            <p className="text-green-100">Analisis detail profit per transaksi penjualan</p>
-          </div>
-          <TrendingUp className="w-16 h-16 opacity-20" />
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold mb-2">Laporan Laba Rugi</h1>
+          <p className="text-green-100">Analisis detail omset, HPP, dan laba per transaksi</p>
         </div>
+        <TrendingUp className="w-16 h-16 opacity-20" />
       </div>
+    </div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="p-2 bg-blue-50 rounded-lg">
-              <Package className="w-5 h-5 text-blue-600" />
-            </div>
-            <p className="text-sm text-gray-500 font-medium">Total Modal</p>
+      {/* Card 1: HPP */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="p-2 bg-blue-50 rounded-lg">
+            <Package className="w-5 h-5 text-blue-600" />
           </div>
-          <p className="text-2xl font-bold text-gray-900">{formatCurrency(summary.totalModal)}</p>
-          <p className="text-xs text-gray-400 mt-1">{summary.totalQty} unit terjual</p>
+          <p className="text-sm text-gray-500 font-medium">HPP (Harga Pokok)</p>
         </div>
-
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="p-2 bg-purple-50 rounded-lg">
-              <TrendingUp className="w-5 h-5 text-purple-600" />
-            </div>
-            <p className="text-sm text-gray-500 font-medium">Total Penjualan</p>
-          </div>
-          <p className="text-2xl font-bold text-gray-900">{formatCurrency(summary.totalPenjualan)}</p>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center gap-3 mb-3">
-            <div className={`p-2 rounded-lg ${summary.totalProfit >= 0 ? 'bg-green-50' : 'bg-red-50'}`}>
-              <TrendingUp className={`w-5 h-5 ${summary.totalProfit >= 0 ? 'text-green-600' : 'text-red-600'}`} />
-            </div>
-            <p className="text-sm text-gray-500 font-medium">Total Profit</p>
-          </div>
-          <p className={`text-2xl font-bold ${summary.totalProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-            {formatCurrency(summary.totalProfit)}
-          </p>
-          <p className="text-xs text-gray-400 mt-1">{profitMargin}% margin</p>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="p-2 bg-indigo-50 rounded-lg">
-              <Calendar className="w-5 h-5 text-indigo-600" />
-            </div>
-            <p className="text-sm text-gray-500 font-medium">Transaksi</p>
-          </div>
-          <p className="text-2xl font-bold text-gray-900">{filteredData.length}</p>
-          <p className="text-xs text-gray-400 mt-1">Total penjualan</p>
-        </div>
+        <p className="text-2xl font-bold text-gray-900">{formatCurrency(summary.totalModal)}</p>
+        <p className="text-xs text-gray-400 mt-1">Dari {summary.totalQty} unit</p>
       </div>
+
+      {/* Card 2: Omset */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="p-2 bg-purple-50 rounded-lg">
+            <TrendingUp className="w-5 h-5 text-purple-600" />
+          </div>
+          <p className="text-sm text-gray-500 font-medium">Total Omset</p>
+        </div>
+        <p className="text-2xl font-bold text-gray-900">{formatCurrency(summary.totalPenjualan)}</p>
+        <p className="text-xs text-gray-400 mt-1">Pendapatan kotor</p>
+      </div>
+
+      {/* Card 3: Laba Bersih */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="flex items-center gap-3 mb-3">
+          <div className={`p-2 rounded-lg ${summary.totalProfit >= 0 ? 'bg-green-50' : 'bg-red-50'}`}>
+            <TrendingUp className={`w-5 h-5 ${summary.totalProfit >= 0 ? 'text-green-600' : 'text-red-600'}`} />
+          </div>
+          <p className="text-sm text-gray-500 font-medium">Laba Bersih</p>
+        </div>
+        <p className={`text-2xl font-bold ${summary.totalProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+          {formatCurrency(summary.totalProfit)}
+        </p>
+        <p className="text-xs text-gray-400 mt-1">{profitMargin}% margin</p>
+      </div>
+
+      {/* Card 4: Total Transaksi */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="p-2 bg-indigo-50 rounded-lg">
+            <Calendar className="w-5 h-5 text-indigo-600" />
+          </div>
+          <p className="text-sm text-gray-500 font-medium">Total Transaksi</p>
+        </div>
+        <p className="text-2xl font-bold text-gray-900">{filteredData.length}</p>
+        <p className="text-xs text-gray-400 mt-1">Transaksi penjualan</p>
+      </div>
+    </div>
 
       {/* Filters */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -458,111 +463,156 @@ const LaporanProfitAdmin = () => {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-bold text-gray-900">Detail Transaksi Penjualan</h3>
-          <p className="text-sm text-gray-500 mt-1">
-            Menampilkan {filteredData.length} transaksi
-          </p>
-        </div>
+<div className="bg-white rounded-xl shadow-sm border border-gray-200">
+  <div className="px-6 py-4 border-b border-gray-200">
+    <h3 className="text-lg font-bold text-gray-900">Detail Transaksi Penjualan</h3>
+    <p className="text-sm text-gray-500 mt-1">
+      Menampilkan {filteredData.length} transaksi
+    </p>
+  </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-green-600 text-white">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-semibold uppercase">Tanggal</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold uppercase">Kode</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold uppercase">Nama Barang</th>
-                <th className="px-6 py-3 text-right text-xs font-semibold uppercase">Qty</th>
-                <th className="px-6 py-3 text-right text-xs font-semibold uppercase">Harga Modal</th>
-                <th className="px-6 py-3 text-right text-xs font-semibold uppercase">Harga Jual</th>
-                <th className="px-6 py-3 text-right text-xs font-semibold uppercase">Total Modal</th>
-                <th className="px-6 py-3 text-right text-xs font-semibold uppercase">Total Penjualan</th>
-                <th className="px-6 py-3 text-right text-xs font-semibold uppercase">Profit</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {filteredData.length === 0 ? (
-                <tr>
-                  <td colSpan="9" className="px-6 py-12 text-center text-gray-500">
-                    <Package className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                    <p className="text-lg font-medium">Tidak ada transaksi penjualan</p>
-                    {filters.productId ? (
-                      <div className="mt-2">
-                        <p className="text-sm text-gray-600">
-                          Produk "{products.find(p => String(p.product_id) === String(filters.productId))?.nama_barang}" 
-                          belum memiliki transaksi penjualan
-                        </p>
-                        <p className="text-xs text-gray-400 mt-1">Coba pilih produk lain atau ubah filter tanggal</p>
-                      </div>
-                    ) : (
-                      <p className="text-sm text-gray-400 mt-1">Silakan ubah filter atau coba periode lain</p>
-                    )}
-                  </td>
-                </tr>
+  <div className="overflow-x-auto">
+    <table className="w-full">
+      <thead className="bg-green-600 text-white">
+        <tr>
+          <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
+            Tanggal
+          </th>
+          <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
+            Kode
+          </th>
+          <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
+            Nama Barang
+          </th>
+          <th className="px-4 py-4 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
+            Qty
+          </th>
+          <th className="px-4 py-4 text-right text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
+            Harga Modal
+          </th>
+          <th className="px-4 py-4 text-right text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
+            Harga Jual
+          </th>
+          <th className="px-4 py-4 text-right text-xs font-semibold uppercase tracking-wider whitespace-nowrap bg-blue-700">
+            HPP
+          </th>
+          <th className="px-4 py-4 text-right text-xs font-semibold uppercase tracking-wider whitespace-nowrap bg-purple-700">
+            Omset
+          </th>
+          <th className="px-4 py-4 text-right text-xs font-semibold uppercase tracking-wider whitespace-nowrap bg-green-700">
+            Laba
+          </th>
+        </tr>
+      </thead>
+      
+      <tbody className="divide-y divide-gray-200">
+        {filteredData.length === 0 ? (
+          <tr>
+            <td colSpan="9" className="px-6 py-12 text-center text-gray-500">
+              <Package className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+              <p className="text-lg font-medium">Tidak ada transaksi penjualan</p>
+              {filters.productId ? (
+                <div className="mt-2">
+                  <p className="text-sm text-gray-600">
+                    Produk "{products.find(p => String(p.product_id) === String(filters.productId))?.nama_barang}" 
+                    belum memiliki transaksi penjualan
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">Coba pilih produk lain atau ubah filter tanggal</p>
+                </div>
               ) : (
-                filteredData.map((item, index) => (
-                  <tr key={item.transaction_id || index} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 text-sm text-gray-900">
-                      {formatDate(item.created_at)}
-                    </td>
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">
-                      {item.product.kode_barang}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-900">
-                      {item.product.nama_barang}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-right text-gray-900">
-                      {item.jumlah}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-right text-gray-600">
-                      {formatCurrency(item.hargaModal)}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-right text-gray-600">
-                      {formatCurrency(item.hargaJual)}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-right font-medium text-blue-600">
-                      {formatCurrency(item.totalModal)}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-right font-medium text-purple-600">
-                      {formatCurrency(item.totalPenjualan)}
-                    </td>
-                    <td className={`px-6 py-4 text-sm text-right font-bold ${
-                      item.profit >= 0 ? 'text-green-600' : 'text-red-600'
-                    }`}>
-                      {formatCurrency(item.profit)}
-                    </td>
-                  </tr>
-                ))
+                <p className="text-sm text-gray-400 mt-1">Silakan ubah filter atau coba periode lain</p>
               )}
-            </tbody>
-            {filteredData.length > 0 && (
-              <tfoot className="bg-gray-50 font-bold border-t-2 border-gray-300">
-                <tr>
-                  <td colSpan="3" className="px-6 py-4 text-sm text-gray-900">
-                    TOTAL
-                  </td>
-                  <td className="px-6 py-4 text-sm text-right text-gray-900">
-                    {summary.totalQty}
-                  </td>
-                  <td colSpan="2"></td>
-                  <td className="px-6 py-4 text-sm text-right text-blue-600">
-                    {formatCurrency(summary.totalModal)}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-right text-purple-600">
-                    {formatCurrency(summary.totalPenjualan)}
-                  </td>
-                  <td className={`px-6 py-4 text-sm text-right ${
-                    summary.totalProfit >= 0 ? 'text-green-600' : 'text-red-600'
-                  }`}>
-                    {formatCurrency(summary.totalProfit)}
-                  </td>
-                </tr>
-              </tfoot>
-            )}
-          </table>
-        </div>
-      </div>
+            </td>
+          </tr>
+        ) : (
+          filteredData.map((item, index) => (
+            <tr 
+              key={item.transaction_id || index} 
+              className="hover:bg-gray-50 transition-colors"
+            >
+              {/* Tanggal */}
+              <td className="px-4 py-3.5 text-sm text-gray-900 whitespace-nowrap">
+                {formatDate(item.created_at)}
+              </td>
+              
+              {/* Kode */}
+              <td className="px-4 py-3.5 text-sm font-medium text-gray-900 whitespace-nowrap">
+                {item.product.kode_barang}
+              </td>
+              
+              {/* Nama Barang */}
+              <td className="px-4 py-3.5 text-sm text-gray-900">
+                <div className="max-w-[200px] truncate" title={item.product.nama_barang}>
+                  {item.product.nama_barang}
+                </div>
+              </td>
+              
+              {/* Qty */}
+              <td className="px-4 py-3.5 text-sm text-center font-semibold text-gray-900 whitespace-nowrap">
+                {item.jumlah}
+              </td>
+              
+              {/* Harga Modal */}
+              <td className="px-4 py-3.5 text-sm text-right text-gray-600 whitespace-nowrap">
+                {formatCurrency(item.hargaModal)}
+              </td>
+              
+              {/* Harga Jual */}
+              <td className="px-4 py-3.5 text-sm text-right text-gray-600 whitespace-nowrap">
+                {formatCurrency(item.hargaJual)}
+              </td>
+              
+              {/* HPP */}
+              <td className="px-4 py-3.5 text-sm text-right font-semibold text-blue-700 whitespace-nowrap bg-blue-50">
+                {formatCurrency(item.totalModal)}
+              </td>
+              
+              {/* Omset */}
+              <td className="px-4 py-3.5 text-sm text-right font-semibold text-purple-700 whitespace-nowrap bg-purple-50">
+                {formatCurrency(item.totalPenjualan)}
+              </td>
+              
+              {/* Laba */}
+              <td className={`px-4 py-3.5 text-sm text-right font-bold whitespace-nowrap ${
+                item.profit >= 0 ? 'text-green-700 bg-green-50' : 'text-red-700 bg-red-50'
+              }`}>
+                {formatCurrency(item.profit)}
+              </td>
+            </tr>
+          ))
+        )}
+      </tbody>
+      
+      {/* Footer */}
+      {filteredData.length > 0 && (
+        <tfoot className="bg-gray-100 border-t-2 border-gray-400">
+          <tr className="font-bold">
+            <td colSpan="3" className="px-4 py-4 text-sm text-gray-900">
+              <div className="flex items-center gap-2">
+                <span className="text-base">TOTAL</span>
+              </div>
+            </td>
+            <td className="px-4 py-4 text-sm text-center text-gray-900 bg-gray-200">
+              <span className="text-base">{summary.totalQty}</span>
+            </td>
+            <td colSpan="2" className="px-4 py-4"></td>
+            <td className="px-4 py-4 text-sm text-right text-blue-700 bg-blue-100">
+              <span className="text-base">{formatCurrency(summary.totalModal)}</span>
+            </td>
+            <td className="px-4 py-4 text-sm text-right text-purple-700 bg-purple-100">
+              <span className="text-base">{formatCurrency(summary.totalPenjualan)}</span>
+            </td>
+            <td className={`px-4 py-4 text-sm text-right ${
+              summary.totalProfit >= 0 ? 'text-green-700 bg-green-100' : 'text-red-700 bg-red-100'
+            }`}>
+              <span className="text-base">{formatCurrency(summary.totalProfit)}</span>
+            </td>
+          </tr>
+        </tfoot>
+      )}
+    </table>
+  </div>
+</div>
     </div>
   );
 };

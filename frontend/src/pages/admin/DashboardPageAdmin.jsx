@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Package, Archive, ShoppingCart, AlertTriangle, TrendingUp, ArrowUpCircle, ArrowDownCircle, BarChart3, Boxes } from 'lucide-react';
+import { Package, Archive, ShoppingCart, AlertTriangle, TrendingUp, ArrowUpCircle, ArrowDownCircle, BarChart3, Boxes, TrendingDown } from 'lucide-react';
 import { productapi } from '../../services/productapi';
 import { stockapi } from '../../services/stockapi';
 
@@ -177,7 +177,6 @@ const DashboardPageAdmin = () => {
   const inPercent = (filteredStats.totalIn / maxValue) * 100;
   const outPercent = (filteredStats.totalOut / maxValue) * 100;
 
-  // Hitung total stok tersedia
   const totalStokTersedia = stats.totalStockIn - stats.totalStockOut;
 
   if (loading) {
@@ -200,7 +199,7 @@ const DashboardPageAdmin = () => {
         </div>
       </div>
 
-      {/* Card Total Stok Tersedia - BARU */}
+      {/**/}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -239,65 +238,85 @@ const DashboardPageAdmin = () => {
               <TrendingUp className="w-6 h-6 text-green-600" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-gray-900">Analisis Profit</h3>
-              <p className="text-sm text-gray-500">Ringkasan modal, penjualan, dan keuntungan</p>
+              <h3 className="text-lg font-bold text-gray-900">Analisis Keuangan</h3>
+              <p className="text-sm text-gray-500">Ringkasan omset, HPP, dan laba bersih</p>
             </div>
           </div>
         </div>
 
-        <div className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 border border-blue-200">
-              <div className="p-3 bg-blue-500 rounded-xl shadow-lg w-fit mb-3">
-                <Package className="w-6 h-6 text-white" />
-              </div>
-              <p className="text-sm text-blue-600 font-medium mb-1">Total Modal Inventory</p>
-              <p className="text-2xl font-bold text-blue-900">{formatCurrency(stats.totalModal)}</p>
-              <p className="text-xs text-blue-500 mt-1">Nilai semua produk di gudang</p>
-            </div>
-
-            <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-6 border border-purple-200">
-              <div className="p-3 bg-purple-500 rounded-xl shadow-lg w-fit mb-3">
-                <ShoppingCart className="w-6 h-6 text-white" />
-              </div>
-              <p className="text-sm text-purple-600 font-medium mb-1">Total Penjualan</p>
-              <p className="text-2xl font-bold text-purple-900">{formatCurrency(stats.totalPenjualan)}</p>
-              <p className="text-xs text-purple-500 mt-1">Dari {stats.totalStockOut} unit terjual</p>
-            </div>
-
-            <div className={`bg-gradient-to-br rounded-xl p-6 border ${
-              stats.profit >= 0 ? 'from-green-50 to-green-100 border-green-200' : 'from-red-50 to-red-100 border-red-200'
-            }`}>
-              <div className={`p-3 rounded-xl shadow-lg w-fit mb-3 ${stats.profit >= 0 ? 'bg-green-500' : 'bg-red-500'}`}>
-                <TrendingUp className="w-6 h-6 text-white" />
-              </div>
-              <p className={`text-sm font-medium mb-1 ${stats.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>Profit Bersih</p>
-              <p className={`text-2xl font-bold ${stats.profit >= 0 ? 'text-green-900' : 'text-red-900'}`}>{formatCurrency(stats.profit)}</p>
-              <p className={`text-xs mt-1 ${stats.profit >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                {stats.profit >= 0 ? 'Keuntungan' : 'Kerugian'} dari penjualan
-              </p>
-            </div>
+      <div className="p-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Card 1: Nilai Inventory */}
+        <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 border border-blue-200">
+          <div className="p-3 bg-blue-500 rounded-xl shadow-lg w-fit mb-3">
+            <Package className="w-6 h-6 text-white" />
           </div>
+          <p className="text-sm text-blue-600 font-medium mb-1">Nilai Inventory</p>
+          <p className="text-2xl font-bold text-blue-900">{formatCurrency(stats.totalModal)}</p>
+          <p className="text-xs text-blue-500 mt-1">Stok di gudang</p>
+        </div>
 
-          <div className="mt-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">💰 Penjualan (Revenue)</span>
-                <span className="font-semibold text-gray-900">{formatCurrency(stats.totalPenjualan)}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">📦 Modal Produk Terjual (COGS)</span>
-                <span className="font-semibold text-gray-900">- {formatCurrency(stats.totalPenjualan - stats.profit)}</span>
-              </div>
-              <div className="border-t border-gray-300 pt-3 flex items-center justify-between">
-                <span className="text-base font-bold text-gray-900">📈 Profit Margin</span>
-                <div className="text-right">
-                  <span className={`text-lg font-bold ${stats.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {formatCurrency(stats.profit)}
-                  </span>
-                  {stats.totalPenjualan > 0 && (
-                    <p className="text-xs text-gray-500">
-                      ({((stats.profit / stats.totalPenjualan) * 100).toFixed(1)}% margin)
+        {/* Card 2: HPP */}
+        <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-6 border border-orange-200">
+          <div className="p-3 bg-orange-500 rounded-xl shadow-lg w-fit mb-3">
+            <TrendingDown className="w-6 h-6 text-white" />
+          </div>
+          <p className="text-sm text-orange-600 font-medium mb-1">HPP</p>
+          <p className="text-2xl font-bold text-orange-900">
+            {formatCurrency(stats.totalPenjualan - stats.profit)}
+          </p>
+          <p className="text-xs text-orange-500 mt-1">Harga Pokok Penjualan</p>
+        </div>
+
+        {/* Card 3: Total Omset */}
+        <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-6 border border-purple-200">
+          <div className="p-3 bg-purple-500 rounded-xl shadow-lg w-fit mb-3">
+            <ShoppingCart className="w-6 h-6 text-white" />
+          </div>
+          <p className="text-sm text-purple-600 font-medium mb-1">Total Omset</p>
+          <p className="text-2xl font-bold text-purple-900">{formatCurrency(stats.totalPenjualan)}</p>
+          <p className="text-xs text-purple-500 mt-1">{stats.totalStockOut} unit terjual</p>
+        </div>
+
+        {/* Card 4: Laba Bersih */}
+        <div className={`bg-gradient-to-br rounded-xl p-6 border ${
+          stats.profit >= 0 ? 'from-green-50 to-green-100 border-green-200' : 'from-red-50 to-red-100 border-red-200'
+        }`}>
+          <div className={`p-3 rounded-xl shadow-lg w-fit mb-3 ${stats.profit >= 0 ? 'bg-green-500' : 'bg-red-500'}`}>
+            <TrendingUp className="w-6 h-6 text-white" />
+          </div>
+          <p className={`text-sm font-medium mb-1 ${stats.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+            Laba Bersih
+          </p>
+          <p className={`text-2xl font-bold ${stats.profit >= 0 ? 'text-green-900' : 'text-red-900'}`}>
+            {formatCurrency(stats.profit)}
+          </p>
+          <p className={`text-xs mt-1 ${stats.profit >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+            {stats.totalPenjualan > 0 && `${((stats.profit / stats.totalPenjualan) * 100).toFixed(1)}% margin`}
+          </p>
+        </div>
+        </div>
+
+      {/**/}
+      <div className="mt-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-gray-600 font-medium">💰 Pendapatan (Omset)</span>
+            <span className="font-semibold text-gray-900">{formatCurrency(stats.totalPenjualan)}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-gray-600 font-medium">📦 HPP (Harga Pokok Penjualan)</span>
+            <span className="font-semibold text-red-600">- {formatCurrency(stats.totalPenjualan - stats.profit)}</span>
+          </div>
+          <div className="border-t border-gray-300 pt-3 flex items-center justify-between">
+            <span className="text-base font-bold text-gray-900">📈 Laba Bersih</span>
+            <div className="text-right">
+              <span className={`text-lg font-bold ${stats.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {formatCurrency(stats.profit)}
+              </span>
+              {stats.totalPenjualan > 0 && (
+                <p className="text-xs text-gray-500">
+                  ({((stats.profit / stats.totalPenjualan) * 100).toFixed(1)}% profit margin)
                     </p>
                   )}
                 </div>
@@ -307,7 +326,7 @@ const DashboardPageAdmin = () => {
         </div>
       </div>
 
-      {/* Stock Summary */}
+      {/**/}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200">
         <div className="px-6 py-4 border-b border-gray-200">
           <div className="flex flex-wrap items-center justify-between gap-4">
