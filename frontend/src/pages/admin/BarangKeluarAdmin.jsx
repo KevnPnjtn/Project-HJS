@@ -178,12 +178,15 @@ const BarangKeluarAdmin = () => {
       };
 
       await stockapi.create(dataToSubmit);
+
+              
       setSuccess('✓ Transaksi barang keluar berhasil disimpan!');
+              
       setTimeout(() => {
-        handleReset();
-        setPagination(prev => ({ ...prev, currentPage: 1 }));
-        fetchInitialData();
-      }, 1500);
+      handleReset();
+      setPagination(prev => ({ ...prev, currentPage: 1 }));
+      fetchInitialData();
+    }, 1500);
 
     } catch (err) {
       setError(err.response?.data?.message || 'Gagal menyimpan transaksi');

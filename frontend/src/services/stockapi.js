@@ -1,4 +1,5 @@
 import api from './api';
+import { cache as productCache } from './productapi';
 
 const cache = {
   data: new Map(),
@@ -88,28 +89,25 @@ export const stockapi = {
 
   create: async (transactionData) => {
     const response = await api.post('/dev/stock-transactions', transactionData);
-    
     cache.invalidate('transactions:');
     cache.invalidate('summary:');
-    
+    productCache.invalidate('products:'); 
     return response.data;
   },
 
   update: async (id, transactionData) => {
     const response = await api.put(`/dev/stock-transactions/${id}`, transactionData);
-    
     cache.invalidate('transactions:');
     cache.invalidate('summary:');
-    
+    productCache.invalidate('products:'); 
     return response.data;
   },
 
   delete: async (id) => {
     const response = await api.delete(`/dev/stock-transactions/${id}`);
-    
     cache.invalidate('transactions:');
     cache.invalidate('summary:');
-    
+    productCache.invalidate('products:'); 
     return response.data;
   },
 

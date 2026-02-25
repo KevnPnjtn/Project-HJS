@@ -1,6 +1,6 @@
 import api from './api';
 
-const cache = {
+export const cache = {
   data: new Map(),
   timestamps: new Map(),
   TTL: 5 * 60 * 1000,
@@ -13,14 +13,12 @@ const cache = {
   get(key) {
     const timestamp = this.timestamps.get(key);
     if (!timestamp) return null;
-
     const age = Date.now() - timestamp;
     if (age > this.TTL) {
       this.data.delete(key);
       this.timestamps.delete(key);
       return null;
     }
-
     return this.data.get(key);
   },
 
@@ -74,19 +72,9 @@ export const productapi = {
   },
 
   getForDropdown: async (params = {}) => {
-    const cacheKey = `products:dropdown:${JSON.stringify(params)}`;
-    
-    const cached = cache.get(cacheKey);
-    if (cached) {
-      return cached;
-    }
 
-    const response = await dedupedRequest(cacheKey, async () => {
-      return await api.get('/dev/products/dropdown/list', { params });
-    });
-
-    cache.set(cacheKey, response);
-    return response;
+    const response = await api.get('/dev/products/dropdown/list', { params });
+  return response;
   },
   
   getById: async (id) => {
