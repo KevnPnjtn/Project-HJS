@@ -127,7 +127,6 @@ const StokOpnameAdmin = () => {
     }));
     setSearchProduct(product.nama_barang);
     setShowDropdown(false);
-    setSuccess(`Produk dipilih: ${product.nama_barang}`);
   };
 
   const handleClearSelection = () => {
@@ -364,29 +363,28 @@ const StokOpnameAdmin = () => {
               Pilih Barang <span className="text-red-500">*</span>
             </label>
             
-            <div className="relative">
-              {!selectedProduct ? (
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setShowDropdown(!showDropdown)}
-                    className="w-full px-4 py-2.5 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-left bg-white hover:bg-gray-50 transition-colors"
-                  >
-                    <span className="text-gray-500">Pilih produk...</span>
-                  </button>
-                  <ChevronDown className={`absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 transition-transform ${showDropdown ? 'rotate-180' : ''}`} />
-                </div>
-              ) : (
-                <div className="flex gap-2">
-                  <div className="flex-1 px-4 py-2.5 border border-purple-300 bg-purple-50 rounded-lg">
-                    <p className="font-semibold text-purple-900">{selectedProduct.nama_barang}</p>
-                    <p className="text-xs text-purple-600">Kode: {selectedProduct.kode_barang}</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleClearSelection}
-                    className="px-3 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors"
-                    title="Hapus pilihan"
+            <div className="h-[42px]">
+            {!selectedProduct ? (
+            <div className="relative h-full">
+              <button
+                type="button"
+                onClick={() => setShowDropdown(!showDropdown)}
+                className="w-full h-full px-4 py-2.5 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-left bg-white hover:bg-gray-50 transition-all"
+              >
+                <span className="text-gray-500">Pilih produk...</span>
+              </button>
+              <ChevronDown className={`absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 transition-transform ${showDropdown ? 'rotate-180' : ''}`} />
+            </div>
+          ) : (
+            <div className="flex gap-2 h-full">
+              <div className="flex-1 px-4 py-2 border-2 border-purple-400 bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg shadow-sm flex items-center">
+                <p className="font-semibold text-purple-900 text-sm truncate">{selectedProduct.nama_barang}</p>
+              </div>
+              <button
+                type="button"
+                onClick={handleClearSelection}
+                className="px-3 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-all hover:scale-105 flex items-center justify-center"
+                title="Hapus pilihan"
                   >
                     <X className="w-5 h-5" />
                   </button>
@@ -394,49 +392,53 @@ const StokOpnameAdmin = () => {
               )}
 
               {showDropdown && !selectedProduct && (
-                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg overflow-hidden">
-                  <div className="p-3 border-b border-gray-200 bg-gray-50">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <input
-                        type="text"
-                        value={searchProduct}
-                        onChange={(e) => setSearchProduct(e.target.value)}
-                        placeholder="Cari nama atau kode barang..."
-                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
-                        autoFocus
-                      />
-                    </div>
+              <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-xl overflow-hidden">
+                <div className="p-3 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-purple-100">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-purple-500" />
+                    <input
+                      type="text"
+                      value={searchProduct}
+                      onChange={(e) => setSearchProduct(e.target.value)}
+                      placeholder="Cari nama atau kode barang..."
+                      className="w-full pl-10 pr-4 py-2 border border-purple-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                      autoFocus
+                    />
                   </div>
-
-                  <div className="max-h-64 overflow-y-auto">
-                    {filteredProducts.length === 0 ? (
-                      <div className="p-4 text-center text-gray-500">
-                        <PackageMinus className="w-12 h-12 mx-auto mb-2 text-gray-300" />
-                        <p className="text-sm">Tidak ada produk ditemukan</p>
+                </div>
+                <div className="max-h-80 overflow-y-auto">
+                  {filteredProducts.length === 0 ? (
+                    <div className="p-6 text-center text-gray-500">
+                      <PackageMinus className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                      <p className="text-sm font-medium">Tidak ada produk ditemukan</p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="sticky top-0 bg-gray-50 px-3 py-2 border-b border-gray-200 text-xs text-gray-600 font-medium">
+                        {filteredProducts.length} produk ditemukan
                       </div>
-                    ) : (
-                      filteredProducts.map((product) => (
+                      {filteredProducts.map((product) => (
                         <div
                           key={product.product_id}
                           onClick={() => handleSelectProduct(product)}
-                          className="p-3 hover:bg-purple-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
+                          className="p-3 hover:bg-purple-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-all hover:pl-5"
                         >
                           <p className="font-medium text-gray-900">{product.nama_barang}</p>
                           <div className="flex justify-between text-xs text-gray-500 mt-1">
                             <span>Kode: {product.kode_barang}</span>
-                            <span className="text-purple-600 font-bold">
-                              Stok Sistem: {product.stok}
+                            <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded-full font-bold">
+                              Stok: {product.stok}
                             </span>
                           </div>
                         </div>
-                      ))
-                    )}
-                  </div>
+                      ))}
+                    </>
+                  )}
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
+        </div>
 
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
