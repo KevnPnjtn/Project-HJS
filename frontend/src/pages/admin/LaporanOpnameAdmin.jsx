@@ -70,7 +70,6 @@ const LaporanOpnameAdmin = () => {
     fetchLaporan();
   };
 
-  // ✅ Fixed Export Function
   const handleExportExcel = () => {
     try {
       const exportData = filteredData.map((item, index) => ({

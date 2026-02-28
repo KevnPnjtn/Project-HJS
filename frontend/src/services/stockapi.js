@@ -141,6 +141,9 @@ export const stockapi = {
     return data;
   },
 
+  getFinanceSummary: (params) =>
+  api.get('/stock-transactions/finance-summary', { params }),
+
   getSummary: async (params = {}) => {
     const cacheKey = `summary:all:${JSON.stringify(params)}`;
     

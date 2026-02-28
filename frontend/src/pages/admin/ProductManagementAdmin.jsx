@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Edit2, Trash2, X, Package, Download, AlertCircle, QrCode, Printer } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, X, Package, Download, QrCode, Printer, AlertCircle } from 'lucide-react';
+import { GlobalStyles, ToastContainer, ConfirmModal } from '../../components/ui/SharedComponents';
+import { useToast } from '../../components/ui/sharedHooks';
 import { productapi } from '../../services/productapi';
 import * as XLSX from 'xlsx';
 import QRCodeLib from 'qrcode';
@@ -16,6 +18,9 @@ const ProductManagementAdmin = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const toast = useToast();
+  const [confirmModal, setConfirmModal] = useState({ open: false, productId: null });
 
   const [pagination, setPagination] = useState({
     currentPage: 1,
@@ -97,8 +102,9 @@ const ProductManagementAdmin = () => {
       XLSX.utils.book_append_sheet(wb, ws, "Data Produk");
       const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
       XLSX.writeFile(wb, `Data_Produk_${timestamp}.xlsx`);
-    } catch (error) {
-      console.error('Export error:', error);
+      toast.success('Data berhasil di-export!', 'Export Berhasil');
+    } catch {
+      toast.error('Gagal export data.', 'Export Gagal');
     }
   };
 
@@ -125,8 +131,8 @@ const ProductManagementAdmin = () => {
         totalItems: responseData.total || productList.length,
         currentPage: responseData.current_page || prev.currentPage
       }));
-    } catch (error) {
-      console.error('Fetch products error:', error);
+    } catch {
+      toast.error('Gagal memuat data produk.', 'Error');
     } finally {
       setLoading(false);
     }
@@ -171,90 +177,100 @@ const ProductManagementAdmin = () => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  setError('');
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setIsSubmitting(true);
 
-  try { 
-    const userStr = localStorage.getItem('user') || sessionStorage.getItem('user');
-    const user = userStr ? JSON.parse(userStr) : {};
-     
-    const dataToSubmit = {
-      kode_barang: formData.kode_barang.trim(),
-      nama_barang: formData.nama_barang.trim(),
-      jenis_barang: formData.jenis_barang.trim() || null,  
-      satuan: formData.satuan,
-      stok_minimal: formData.stok_minimal ? parseInt(formData.stok_minimal) : 0,
-      stok: 0,  
-      harga_modal: parseFloat(formData.harga_modal) || 0,
-      harga_jual: parseFloat(formData.harga_jual) || 0,
-      user_id: user.user_id || null
-    };
- 
-    if (!dataToSubmit.kode_barang || !dataToSubmit.nama_barang || !dataToSubmit.satuan) {
-      setError('Mohon lengkapi semua field yang wajib diisi (Kode Barang, Nama Barang, Satuan)');
-      return;
-    }
-
-    if (dataToSubmit.harga_modal <= 0 || dataToSubmit.harga_jual <= 0) {
-      setError('Harga Modal dan Harga Jual harus lebih dari 0');
-      return;
-    }
-
-    if (modalMode === 'add') {
-      await productapi.create(dataToSubmit);
-    } else {
-      await productapi.update(selectedProduct.product_id, dataToSubmit);
-    }
-    
-    handleCloseModal();
-    setPagination(prev => ({ ...prev, currentPage: 1 }));
-    fetchProducts();
-  } catch (error) {
-    if (error.response?.status === 422) {
-      const errors = error.response?.data?.errors;
-      if (errors) {
-        const errorMessages = Object.values(errors).flat().join(', ');
-        setError(`Validasi gagal: ${errorMessages}`);
-      } else {
-        setError(error.response?.data?.message || 'Validasi gagal. Periksa kembali data yang diinput.');
+    try { 
+      const userStr = localStorage.getItem('user') || sessionStorage.getItem('user');
+      const user = userStr ? JSON.parse(userStr) : {};
+       
+      const dataToSubmit = {
+        kode_barang: formData.kode_barang.trim(),
+        nama_barang: formData.nama_barang.trim(),
+        jenis_barang: formData.jenis_barang.trim() || null,  
+        satuan: formData.satuan,
+        stok_minimal: formData.stok_minimal ? parseInt(formData.stok_minimal) : 0,
+        stok: 0,  
+        harga_modal: parseFloat(formData.harga_modal) || 0,
+        harga_jual: parseFloat(formData.harga_jual) || 0,
+        user_id: user.user_id || null
+      };
+   
+      if (!dataToSubmit.kode_barang || !dataToSubmit.nama_barang || !dataToSubmit.satuan) {
+        setError('Mohon lengkapi semua field yang wajib diisi (Kode Barang, Nama Barang, Satuan)');
+        return;
       }
-    } else {
-      setError(error.response?.data?.message || 'Gagal menyimpan produk. Silakan coba lagi.');
-    }
-  }
-};
 
-const handleDelete = async (productId) => {
-  if (window.confirm('Apakah Anda yakin ingin menghapus produk ini?')) {
+      if (dataToSubmit.harga_modal <= 0 || dataToSubmit.harga_jual <= 0) {
+        setError('Harga Modal dan Harga Jual harus lebih dari 0');
+        return;
+      }
+
+      if (modalMode === 'add') {
+        await productapi.create(dataToSubmit);
+        toast.success('Produk berhasil ditambahkan!', 'Berhasil');
+      } else {
+        await productapi.update(selectedProduct.product_id, dataToSubmit);
+        toast.success('Produk berhasil diperbarui!', 'Berhasil');
+      }
+      
+      handleCloseModal();
+      setPagination(prev => ({ ...prev, currentPage: 1 }));
+      fetchProducts();
+    } catch (error) {
+      if (error.response?.status === 422) {
+        const errors = error.response?.data?.errors;
+        if (errors) {
+          const errorMessages = Object.values(errors).flat().join(', ');
+          setError(`Validasi gagal: ${errorMessages}`);
+        } else {
+          setError(error.response?.data?.message || 'Validasi gagal. Periksa kembali data yang diinput.');
+        }
+      } else {
+        setError(error.response?.data?.message || 'Gagal menyimpan produk. Silakan coba lagi.');
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Buka confirm modal sebelum hapus
+  const handleDelete = (productId) => {
+    setConfirmModal({ open: true, productId });
+  };
+
+  // Eksekusi hapus setelah konfirmasi
+  const handleConfirmDelete = async () => {
     try {
-      await productapi.delete(productId);
+      await productapi.delete(confirmModal.productId);
+      toast.success('Produk berhasil dihapus.', 'Berhasil');
       fetchProducts();
     } catch {
-      alert('Gagal menghapus produk');
+      toast.error('Gagal menghapus produk.', 'Error');
     }
-  }
-};
+  };
 
-const handleOpenQRModal = async (product) => {
-  setSelectedQRProduct(product);
-  setShowQRModal(true);
-  
-  try {
-    const qrData = product.kode_barang;
-    const dataURL = await QRCodeLib.toDataURL(qrData, {
-      width: 300,
-      margin: 2,
-      color: {
-        dark: '#000000',
-        light: '#FFFFFF'
-      }
-    });
-    setQrCodeDataURL(dataURL);
-  } catch {
-    // QR code generation failed silently
-  }
-};
+  const handleOpenQRModal = async (product) => {
+    setSelectedQRProduct(product);
+    setShowQRModal(true);
+    
+    try {
+      const qrData = product.kode_barang;
+      const dataURL = await QRCodeLib.toDataURL(qrData, {
+        width: 300,
+        margin: 2,
+        color: {
+          dark: '#000000',
+          light: '#FFFFFF'
+        }
+      });
+      setQrCodeDataURL(dataURL);
+    } catch {
+      toast.error('Gagal membuat QR Code.', 'Error');
+    }
+  };
 
   const handleDownloadQR = () => {
     if (!qrCodeDataURL || !selectedQRProduct) return;
@@ -338,6 +354,22 @@ const handleOpenQRModal = async (product) => {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Global styles & Toast */}
+      <GlobalStyles />
+      <ToastContainer toasts={toast.toasts} onRemove={toast.remove} />
+
+      {/* Confirm Modal Hapus */}
+      <ConfirmModal
+        isOpen={confirmModal.open}
+        onClose={() => setConfirmModal({ open: false, productId: null })}
+        onConfirm={handleConfirmDelete}
+        title="Hapus Produk"
+        message="Apakah Anda yakin ingin menghapus produk ini? Tindakan ini tidak dapat dibatalkan."
+        confirmText="Hapus"
+        confirmColor="red"
+        icon={Trash2}
+      />
+
       <div className="bg-white shadow-sm border-b border-gray-200 p-6">
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -547,6 +579,7 @@ const handleOpenQRModal = async (product) => {
         )}
       </div>
 
+      {/* QR Code Modal */}
       {showQRModal && selectedQRProduct && (
         <div 
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -612,6 +645,7 @@ const handleOpenQRModal = async (product) => {
         </div>
       )}
 
+      {/* Add / Edit Modal */}
       {showModal && (
         <div 
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -775,9 +809,24 @@ const handleOpenQRModal = async (product) => {
               <div className="flex gap-3 pt-4">
                 <button
                   type="submit"
-                  className="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-all font-semibold shadow-md hover:shadow-lg"
+                  disabled={isSubmitting}
+                  className={`flex-1 flex items-center justify-center gap-2 text-white py-3 rounded-lg transition-all font-semibold shadow-md
+                    ${isSubmitting
+                      ? 'bg-blue-400 cursor-not-allowed scale-[0.98] shadow-inner'
+                      : 'bg-blue-600 hover:bg-blue-700 hover:shadow-lg active:scale-[0.97] active:shadow-inner'
+                    }`}
                 >
-                  {modalMode === 'add' ? 'Simpan' : 'Update'}
+                  {isSubmitting ? (
+                    <>
+                      <svg className="animate-spin w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                      </svg>
+                      {modalMode === 'add' ? 'Menyimpan...' : 'Memperbarui...'}
+                    </>
+                  ) : (
+                    modalMode === 'add' ? 'Simpan' : 'Update'
+                  )}
                 </button>
                 <button
                   type="button"

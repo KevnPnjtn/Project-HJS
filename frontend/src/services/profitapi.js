@@ -58,7 +58,7 @@ const dedupedRequest = async (key, requestFn) => {
 export const profitapi = {
   getAll: async (params = {}) => {
     const cacheKey = `profit:all:${JSON.stringify(params)}`;
-    
+
     const cached = cache.get(cacheKey);
     if (cached) return cached;
 
@@ -73,7 +73,7 @@ export const profitapi = {
 
   getById: async (id) => {
     const cacheKey = `profit:${id}`;
-    
+
     const cached = cache.get(cacheKey);
     if (cached) return cached;
 
@@ -88,44 +88,36 @@ export const profitapi = {
 
   generate: async (reportData) => {
     const response = await api.post('/dev/profit-reports/generate', reportData);
-    
     cache.invalidate('profit:');
-    
     return response.data;
   },
 
   generateDaily: async (date) => {
     const response = await api.post('/dev/profit-reports/generate/daily', { date });
-    
     cache.invalidate('profit:');
-    
     return response.data;
   },
 
   generateWeekly: async (date) => {
     const response = await api.post('/dev/profit-reports/generate/weekly', { date });
-    
     cache.invalidate('profit:');
-    
     return response.data;
   },
 
   generateMonthly: async (date) => {
     const response = await api.post('/dev/profit-reports/generate/monthly', { date });
-    
     cache.invalidate('profit:');
-    
     return response.data;
   },
 
   getSummary: async (params = {}) => {
     const cacheKey = `profit:summary:${JSON.stringify(params)}`;
-    
+
     const cached = cache.get(cacheKey);
     if (cached) return cached;
 
     const data = await dedupedRequest(cacheKey, async () => {
-      const response = await api.get('/dev/profit-reports/summary', { params });
+      const response = await api.get('/dev/profit-reports/summary/all', { params });
       return response.data;
     });
 
@@ -135,9 +127,7 @@ export const profitapi = {
 
   delete: async (id) => {
     const response = await api.delete(`/dev/profit-reports/${id}`);
-    
     cache.invalidate('profit:');
-    
     return response.data;
   },
 

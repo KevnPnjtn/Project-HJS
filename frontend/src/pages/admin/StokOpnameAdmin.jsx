@@ -14,7 +14,7 @@ const StokOpnameAdmin = () => {
     catatan: '',
     sesuaikan_stok: false
   });
-  
+
   const [products, setProducts] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [searchProduct, setSearchProduct] = useState('');
@@ -27,12 +27,12 @@ const StokOpnameAdmin = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
   useEffect(() => {
-    fetchProducts();
-    fetchOpnames();
+    fetchInitialData();
   }, []);
 
   useEffect(() => {
@@ -47,28 +47,46 @@ const StokOpnameAdmin = () => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setShowDropdown(false);
-        if (!selectedProduct) {
-            setSearchProduct('');
-        }
+        if (!selectedProduct) setSearchProduct('');
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [selectedProduct]);
 
-  const fetchProducts = async () => {
+  // Fetch produk + opname paralel, produk diurutkan terbaru (product_id terbesar) dulu
+  const fetchInitialData = async () => {
     try {
-      setLoading(true);
-      const response = await productapi.getForDropdown();
-      setProducts(response.data?.data || []);
+      setInitialLoading(true);
+      setError('');
+
+      const [productsResponse, opnamesResponse] = await Promise.all([
+        productapi.getForDropdown(),
+        stockopnameapi.getAll()
+      ]);
+
+      // Normalisasi array produk
+      let allProducts = productsResponse.data?.data || productsResponse.data || [];
+      if (!Array.isArray(allProducts)) allProducts = [];
+
+      // Urutkan terbaru ke lama (sama seperti BarangMasukAdmin)
+      const sortedProducts = [...allProducts].sort((a, b) => b.product_id - a.product_id);
+      setProducts(sortedProducts);
+      setFilteredProducts(sortedProducts);
+
+      // Opname list
+      const opnameList = opnamesResponse.data?.data || [];
+      setOpnames(opnameList);
+
     } catch (err) {
       console.error('Error:', err);
-      setError('Gagal memuat produk');
+      setError('Gagal memuat data');
     } finally {
-      setLoading(false);
+      setInitialLoading(false);
     }
   };
 
+  // Helper — refresh hanya opname (setelah simpan/hapus/adjust)
   const fetchOpnames = async () => {
     try {
       setLoading(true);
@@ -82,31 +100,47 @@ const StokOpnameAdmin = () => {
     }
   };
 
+  // Helper — refresh hanya produk (setelah simpan/adjust yang mengubah stok)
+  const fetchProducts = async () => {
+    try {
+      setLoading(true);
+      const response = await productapi.getForDropdown();
+      let allProducts = response.data?.data || response.data || [];
+      if (!Array.isArray(allProducts)) allProducts = [];
+      const sortedProducts = [...allProducts].sort((a, b) => b.product_id - a.product_id);
+      setProducts(sortedProducts);
+      setFilteredProducts(sortedProducts);
+    } catch (err) {
+      console.error('Error:', err);
+      setError('Gagal memuat produk');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filterProductDropdown = () => {
     if (!searchProduct.trim()) {
       setFilteredProducts(products);
       return;
     }
-    const filtered = products.filter(p =>
-      p.nama_barang?.toLowerCase().includes(searchProduct.toLowerCase()) ||
-      p.kode_barang?.toLowerCase().includes(searchProduct.toLowerCase()) ||
-      p.jenis_barang?.toLowerCase().includes(searchProduct.toLowerCase())
-    );
-    setFilteredProducts(filtered);
+    const q = searchProduct.toLowerCase();
+    setFilteredProducts(products.filter(p =>
+      p.nama_barang?.toLowerCase().includes(q) ||
+      p.kode_barang?.toLowerCase().includes(q) ||
+      p.jenis_barang?.toLowerCase().includes(q)
+    ));
   };
 
   const filterOpnames = () => {
     let filtered = opnames;
-
     if (searchTerm.trim()) {
-      filtered = filtered.filter(o => 
-        o.product?.kode_barang?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        o.product?.nama_barang?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        o.nama_petugas?.toLowerCase().includes(searchTerm.toLowerCase())
+      const q = searchTerm.toLowerCase();
+      filtered = filtered.filter(o =>
+        o.product?.kode_barang?.toLowerCase().includes(q) ||
+        o.product?.nama_barang?.toLowerCase().includes(q) ||
+        o.nama_petugas?.toLowerCase().includes(q)
       );
     }
-
     if (statusFilter !== 'all') {
       filtered = filtered.filter(o => {
         if (statusFilter === 'disesuaikan') return o.status_penyesuaian === 'Disesuaikan';
@@ -114,17 +148,12 @@ const StokOpnameAdmin = () => {
         return true;
       });
     }
-
     setFilteredOpnames(filtered);
   };
 
   const handleSelectProduct = (product) => {
     setSelectedProduct(product);
-    setFormData(prev => ({
-        ...prev,
-        product_id: product.product_id,
-        kode_barang: product.kode_barang
-    }));
+    setFormData(prev => ({ ...prev, product_id: product.product_id, kode_barang: product.kode_barang }));
     setSearchProduct(product.nama_barang);
     setShowDropdown(false);
   };
@@ -143,14 +172,13 @@ const StokOpnameAdmin = () => {
   const handleSimpan = async () => {
     setError('');
     setSuccess('');
-
     if (!formData.tanggal_opname) return setError('Tanggal harus diisi!');
     if (!selectedProduct) return setError('Pilih produk!');
     if (formData.stok_fisik === '') return setError('Stok fisik harus diisi!');
 
     try {
       setLoading(true);
-      
+
       const dataToSubmit = {
         product_id: parseInt(selectedProduct.product_id),
         tanggal_opname: formData.tanggal_opname,
@@ -161,15 +189,14 @@ const StokOpnameAdmin = () => {
       };
 
       await stockopnameapi.create(dataToSubmit);
-      
+
       setSuccess('✅ Stok opname berhasil disimpan!');
-      
+
       setTimeout(() => {
         handleReset();
-        fetchOpnames(); 
-        fetchProducts(); 
+        fetchOpnames();
+        fetchProducts();
       }, 1000);
-
     } catch (err) {
       console.error('Error:', err);
       setError(err.response?.data?.message || 'Gagal menyimpan');
@@ -218,12 +245,8 @@ const StokOpnameAdmin = () => {
   const handleReset = () => {
     setFormData({
       tanggal_opname: new Date().toISOString().split('T')[0],
-      kode_barang: '',
-      product_id: '',
-      stok_fisik: '',
-      nama_petugas: '',
-      catatan: '',
-      sesuaikan_stok: false
+      kode_barang: '', product_id: '', stok_fisik: '',
+      nama_petugas: '', catatan: '', sesuaikan_stok: false
     });
     setSelectedProduct(null);
     setSearchProduct('');
@@ -248,18 +271,10 @@ const StokOpnameAdmin = () => {
 
       const wb = XLSX.utils.book_new();
       const ws = XLSX.utils.json_to_sheet(exportData);
-
       ws['!cols'] = [
-        { wch: 5 },
-        { wch: 12 },
-        { wch: 15 },
-        { wch: 30 },
-        { wch: 12 },
-        { wch: 12 },
-        { wch: 10 },
-        { wch: 20 },
-        { wch: 18 },
-        { wch: 30 }
+        { wch: 5 }, { wch: 12 }, { wch: 15 }, { wch: 30 },
+        { wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 20 },
+        { wch: 18 }, { wch: 30 }
       ];
 
       const range = XLSX.utils.decode_range(ws['!ref']);
@@ -267,7 +282,7 @@ const StokOpnameAdmin = () => {
         for (let C = range.s.c; C <= range.e.c; ++C) {
           const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
           if (!ws[cellAddress]) continue;
-          
+
           if (R === 0) {
             ws[cellAddress].s = {
               font: { bold: true, color: { rgb: "FFFFFF" } },
@@ -282,9 +297,9 @@ const StokOpnameAdmin = () => {
             };
           } else {
             ws[cellAddress].s = {
-              alignment: { 
+              alignment: {
                 horizontal: C === 0 || C === 4 || C === 5 || C === 6 ? "center" : "left",
-                vertical: "center" 
+                vertical: "center"
               },
               border: {
                 top: { style: "thin", color: { rgb: "CCCCCC" } },
@@ -299,27 +314,27 @@ const StokOpnameAdmin = () => {
       }
 
       XLSX.utils.book_append_sheet(wb, ws, "Stok Opname");
-      const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
-      XLSX.writeFile(wb, `Stok_Opname_${timestamp}.xlsx`);
-      
-      setSuccess('✓ Data berhasil di-export!');
-      setTimeout(() => setSuccess(''), 3000);
+      XLSX.writeFile(wb, `Stok_Opname_${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.xlsx`);
     } catch (err) {
       console.error('Error exporting:', err);
-      setError('Gagal export data');
-      setTimeout(() => setError(''), 3000);
     }
   };
 
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('id-ID', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    });
-  };
+  const formatDate = (dateString) =>
+    new Date(dateString).toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
   const selisih = calculateSelisih();
+
+  if (initialLoading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-purple-600 mx-auto mb-4" />
+          <p className="text-gray-600">Memuat data stok opname...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -335,17 +350,14 @@ const StokOpnameAdmin = () => {
         </div>
 
         {success && (
-          <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg text-green-700">
-            {success}
-          </div>
+          <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg text-green-700">{success}</div>
         )}
         {error && (
-          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-            {error}
-          </div>
+          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">{error}</div>
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          {/* Tanggal */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
               Tanggal Opname <span className="text-red-500">*</span>
@@ -358,33 +370,33 @@ const StokOpnameAdmin = () => {
             />
           </div>
 
+          {/* Dropdown Barang */}
           <div className="relative" ref={dropdownRef}>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
               Pilih Barang <span className="text-red-500">*</span>
             </label>
-            
             <div className="h-[42px]">
-            {!selectedProduct ? (
-            <div className="relative h-full">
-              <button
-                type="button"
-                onClick={() => setShowDropdown(!showDropdown)}
-                className="w-full h-full px-4 py-2.5 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-left bg-white hover:bg-gray-50 transition-all"
-              >
-                <span className="text-gray-500">Pilih produk...</span>
-              </button>
-              <ChevronDown className={`absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 transition-transform ${showDropdown ? 'rotate-180' : ''}`} />
-            </div>
-          ) : (
-            <div className="flex gap-2 h-full">
-              <div className="flex-1 px-4 py-2 border-2 border-purple-400 bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg shadow-sm flex items-center">
-                <p className="font-semibold text-purple-900 text-sm truncate">{selectedProduct.nama_barang}</p>
-              </div>
-              <button
-                type="button"
-                onClick={handleClearSelection}
-                className="px-3 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-all hover:scale-105 flex items-center justify-center"
-                title="Hapus pilihan"
+              {!selectedProduct ? (
+                <div className="relative h-full">
+                  <button
+                    type="button"
+                    onClick={() => setShowDropdown(!showDropdown)}
+                    className="w-full h-full px-4 py-2.5 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-left bg-white hover:bg-gray-50 transition-all"
+                  >
+                    <span className="text-gray-500">Pilih produk...</span>
+                  </button>
+                  <ChevronDown className={`absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 transition-transform ${showDropdown ? 'rotate-180' : ''}`} />
+                </div>
+              ) : (
+                <div className="flex gap-2 h-full">
+                  <div className="flex-1 px-4 py-2 border-2 border-purple-400 bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg shadow-sm flex items-center">
+                    <p className="font-semibold text-purple-900 text-sm truncate">{selectedProduct.nama_barang}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleClearSelection}
+                    className="px-3 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-all hover:scale-105 flex items-center justify-center"
+                    title="Hapus pilihan"
                   >
                     <X className="w-5 h-5" />
                   </button>
@@ -392,58 +404,61 @@ const StokOpnameAdmin = () => {
               )}
 
               {showDropdown && !selectedProduct && (
-              <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-xl overflow-hidden">
-                <div className="p-3 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-purple-100">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-purple-500" />
-                    <input
-                      type="text"
-                      value={searchProduct}
-                      onChange={(e) => setSearchProduct(e.target.value)}
-                      placeholder="Cari nama atau kode barang..."
-                      className="w-full pl-10 pr-4 py-2 border border-purple-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
-                      autoFocus
-                    />
+                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-xl overflow-hidden">
+                  <div className="p-3 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-purple-100">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-purple-500" />
+                      <input
+                        type="text"
+                        value={searchProduct}
+                        onChange={(e) => setSearchProduct(e.target.value)}
+                        placeholder="Cari nama atau kode barang..."
+                        className="w-full pl-10 pr-4 py-2 border border-purple-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                        autoFocus
+                      />
+                    </div>
+                  </div>
+                  <div className="max-h-80 overflow-y-auto">
+                    {filteredProducts.length === 0 ? (
+                      <div className="p-6 text-center text-gray-500">
+                        <PackageMinus className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                        <p className="text-sm font-medium">Tidak ada produk ditemukan</p>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="sticky top-0 bg-gray-50 px-3 py-2 border-b border-gray-200 text-xs text-gray-600 font-medium flex items-center justify-between">
+                          <span>{filteredProducts.length} produk ditemukan</span>
+                          <span className="text-gray-400 italic">Terbaru di atas</span>
+                        </div>
+                        {filteredProducts.map((product) => (
+                          <div
+                            key={product.product_id}
+                            onClick={() => handleSelectProduct(product)}
+                            className="p-3 hover:bg-purple-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-all hover:pl-5"
+                          >
+                            <p className="font-medium text-gray-900">{product.nama_barang}</p>
+                            <div className="flex justify-between text-xs text-gray-500 mt-1">
+                              <span>Kode: {product.kode_barang}</span>
+                              <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded-full font-bold">
+                                Stok: {product.stok}
+                              </span>
+                            </div>
+                            {product.jenis_barang && (
+                              <p className="text-xs text-gray-400 mt-1">Jenis: {product.jenis_barang}</p>
+                            )}
+                          </div>
+                        ))}
+                      </>
+                    )}
                   </div>
                 </div>
-                <div className="max-h-80 overflow-y-auto">
-                  {filteredProducts.length === 0 ? (
-                    <div className="p-6 text-center text-gray-500">
-                      <PackageMinus className="w-12 h-12 mx-auto mb-2 text-gray-300" />
-                      <p className="text-sm font-medium">Tidak ada produk ditemukan</p>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="sticky top-0 bg-gray-50 px-3 py-2 border-b border-gray-200 text-xs text-gray-600 font-medium">
-                        {filteredProducts.length} produk ditemukan
-                      </div>
-                      {filteredProducts.map((product) => (
-                        <div
-                          key={product.product_id}
-                          onClick={() => handleSelectProduct(product)}
-                          className="p-3 hover:bg-purple-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-all hover:pl-5"
-                        >
-                          <p className="font-medium text-gray-900">{product.nama_barang}</p>
-                          <div className="flex justify-between text-xs text-gray-500 mt-1">
-                            <span>Kode: {product.kode_barang}</span>
-                            <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded-full font-bold">
-                              Stok: {product.stok}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </>
-                  )}
-                </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
-        </div>
 
+          {/* Nama Petugas */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Nama Petugas
-            </label>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Nama Petugas</label>
             <input
               type="text"
               value={formData.nama_petugas}
@@ -504,13 +519,11 @@ const StokOpnameAdmin = () => {
                   className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
                 />
               </div>
-
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Selisih</label>
                 <div className={`px-4 py-2.5 rounded-lg font-bold text-lg ${
                   selisih === 0 ? 'bg-gray-100 text-gray-700' :
-                  selisih > 0 ? 'bg-green-100 text-green-700' :
-                  'bg-red-100 text-red-700'
+                  selisih > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
                 }`}>
                   {selisih > 0 ? '+' : ''}{selisih}
                 </div>
@@ -518,9 +531,7 @@ const StokOpnameAdmin = () => {
             </div>
 
             <div className="mb-4">
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Catatan (Opsional)
-              </label>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Catatan (Opsional)</label>
               <textarea
                 value={formData.catatan}
                 onChange={(e) => setFormData({ ...formData, catatan: e.target.value })}
@@ -539,9 +550,7 @@ const StokOpnameAdmin = () => {
                 className="mt-1 w-5 h-5 text-purple-600 focus:ring-purple-500 rounded"
               />
               <label htmlFor="sesuaikan" className="flex-1 cursor-pointer">
-                <span className="font-semibold text-red-700">
-                  Ya, sesuaikan stok di sistem dengan hasil hitung fisik.
-                </span>
+                <span className="font-semibold text-red-700">Ya, sesuaikan stok di sistem dengan hasil hitung fisik.</span>
                 <p className="text-sm text-gray-600 mt-1">
                   Jika dicentang, stok di sistem akan otomatis disesuaikan dengan stok fisik yang diinput.
                   Jika tidak, data hanya disimpan tanpa mengubah stok sistem.
@@ -570,6 +579,7 @@ const StokOpnameAdmin = () => {
         </div>
       </div>
 
+      {/* Riwayat Stok Opname */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200">
         <div className="px-6 py-4 border-b border-gray-200">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -594,7 +604,7 @@ const StokOpnameAdmin = () => {
                   className="pl-11 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
                 />
               </div>
-              <button 
+              <button
                 onClick={handleExport}
                 className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
               >
@@ -631,43 +641,28 @@ const StokOpnameAdmin = () => {
               ) : (
                 filteredOpnames.map((opname) => (
                   <tr key={opname.opname_id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                    <td className="py-4 px-6 text-sm text-gray-700">
-                      {formatDate(opname.tanggal_opname)}
-                    </td>
-                    <td className="py-4 px-6 text-sm font-medium text-gray-900">
-                      {opname.product?.kode_barang || '-'}
-                    </td>
-                    <td className="py-4 px-6 text-sm text-gray-700">
-                      {opname.product?.nama_barang || '-'}
-                    </td>
-                    <td className="py-4 px-6 text-center text-sm font-semibold text-gray-900">
-                      {opname.stok_sistem}
-                    </td>
-                    <td className="py-4 px-6 text-center text-sm font-semibold text-gray-900">
-                      {opname.stok_fisik}
-                    </td>
+                    <td className="py-4 px-6 text-sm text-gray-700">{formatDate(opname.tanggal_opname)}</td>
+                    <td className="py-4 px-6 text-sm font-medium text-gray-900">{opname.product?.kode_barang || '-'}</td>
+                    <td className="py-4 px-6 text-sm text-gray-700">{opname.product?.nama_barang || '-'}</td>
+                    <td className="py-4 px-6 text-center text-sm font-semibold text-gray-900">{opname.stok_sistem}</td>
+                    <td className="py-4 px-6 text-center text-sm font-semibold text-gray-900">{opname.stok_fisik}</td>
                     <td className="py-4 px-6 text-center">
                       <span className={`inline-block px-3 py-1 rounded-full font-semibold text-sm ${
                         opname.selisih === 0 ? 'bg-gray-100 text-gray-700' :
-                        opname.selisih > 0 ? 'bg-green-100 text-green-700' :
-                        'bg-red-100 text-red-700'
+                        opname.selisih > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
                       }`}>
                         {opname.selisih > 0 ? '+' : ''}{opname.selisih}
                       </span>
                     </td>
-                    <td className="py-4 px-6 text-sm text-gray-700">
-                      {opname.nama_petugas || '-'}
-                    </td>
+                    <td className="py-4 px-6 text-sm text-gray-700">{opname.nama_petugas || '-'}</td>
                     <td className="py-4 px-6 text-center">
                       {opname.status_penyesuaian === 'Disesuaikan' ? (
                         <span className="inline-flex items-center gap-1 px-3 py-1 bg-green-100 text-green-700 rounded-full font-semibold text-sm">
-                          <CheckCircle className="w-4 h-4" />
-                          Disesuaikan
+                          <CheckCircle className="w-4 h-4" /> Disesuaikan
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full font-semibold text-sm">
-                          <AlertCircle className="w-4 h-4" />
-                          Belum Disesuaikan
+                          <AlertCircle className="w-4 h-4" /> Belum Disesuaikan
                         </span>
                       )}
                     </td>
@@ -705,9 +700,7 @@ const StokOpnameAdmin = () => {
 
         {filteredOpnames.length > 0 && (
           <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
-            <p className="text-sm text-gray-600">
-              Menampilkan {filteredOpnames.length} data opname
-            </p>
+            <p className="text-sm text-gray-600">Menampilkan {filteredOpnames.length} data opname</p>
           </div>
         )}
       </div>
@@ -715,4 +708,4 @@ const StokOpnameAdmin = () => {
   );
 };
 
-export default StokOpnameAdmin;
+export default StokOpnameAdmin; 

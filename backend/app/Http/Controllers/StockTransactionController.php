@@ -8,15 +8,11 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 
 class StockTransactionController extends Controller
 {
     public function index(Request $request)
     {
-        DB::enableQueryLog();
-        $startTime = microtime(true);
-
         $query = StockTransaction::select([
             'transaction_id',
             'product_id',
@@ -27,7 +23,7 @@ class StockTransactionController extends Controller
             'penanggung_jawab',
             'created_at'
         ])->with([
-            'product:product_id,kode_barang,nama_barang,stok,satuan', 
+            'product:product_id,kode_barang,nama_barang,stok,satuan',
             'user:user_id,username'
         ]);
 
@@ -49,23 +45,9 @@ class StockTransactionController extends Controller
 
         $transactions = $query->latest()->paginate($request->per_page ?? 5);
 
-        $endTime = microtime(true);
-        $executionTime = ($endTime - $startTime) * 1000;
-        
-        $queries = DB::getQueryLog();
-        
-        Log::info('StockTransactionController@index Debug:', [
-            'execution_time_ms' => round($executionTime, 2),
-            'total_queries' => count($queries)
-        ]);
-
         return response()->json([
             'success' => true,
-            'data' => $transactions,
-            'debug' => [
-                'execution_time_ms' => round($executionTime, 2),
-                'total_queries' => count($queries)
-            ]
+            'data'    => $transactions,
         ]);
     }
 
@@ -85,32 +67,32 @@ class StockTransactionController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $transaction
+            'data'    => $transaction,
         ]);
     }
 
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'product_id' => 'required|exists:products,product_id',
-            'user_id' => 'nullable|exists:users,user_id',
-            'jenis_transaksi' => 'required|in:IN,OUT,ADJUST',
-            'jumlah' => 'required|integer|min:1',
-            'catatan' => 'nullable|string',
+            'product_id'       => 'required|exists:products,product_id',
+            'user_id'          => 'nullable|exists:users,user_id',
+            'jenis_transaksi'  => 'required|in:IN,OUT,ADJUST',
+            'jumlah'           => 'required|integer|min:1',
+            'catatan'          => 'nullable|string',
             'penanggung_jawab' => 'nullable|string|max:100',
         ]);
 
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
-                'errors' => $validator->errors()
+                'errors'  => $validator->errors()
             ], 422);
         }
 
         if ($request->jenis_transaksi === 'OUT') {
             $product = Product::select('product_id', 'stok', 'nama_barang')
                 ->find($request->product_id);
-                
+
             if ($product->stok < $request->jumlah) {
                 return response()->json([
                     'success' => false,
@@ -126,7 +108,7 @@ class StockTransactionController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Transaction created successfully',
-            'data' => $transaction->load([
+            'data'    => $transaction->load([
                 'product:product_id,kode_barang,nama_barang,stok',
                 'user:user_id,username'
             ])
@@ -145,30 +127,30 @@ class StockTransactionController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'jumlah' => 'sometimes|integer|min:1',
-            'catatan' => 'nullable|string',
+            'jumlah'           => 'sometimes|integer|min:1',
+            'catatan'          => 'nullable|string',
             'penanggung_jawab' => 'nullable|string|max:100',
         ]);
 
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
-                'errors' => $validator->errors()
+                'errors'  => $validator->errors()
             ], 422);
         }
 
-        $oldJumlah = $transaction->jumlah;
-        $newJumlah = $request->jumlah ?? $oldJumlah;
+        $oldJumlah  = $transaction->jumlah;
+        $newJumlah  = $request->jumlah ?? $oldJumlah;
 
         $transaction->update($request->only(['jumlah', 'catatan', 'penanggung_jawab']));
 
         if ($oldJumlah != $newJumlah) {
             $difference = $newJumlah - $oldJumlah;
-            
+            $multiplier = $transaction->jenis_transaksi === 'IN' ? 1 : -1;
+
             Product::where('product_id', $transaction->product_id)
                 ->update([
-                    'stok' => DB::raw("stok + ({$difference} * " . 
-                        ($transaction->jenis_transaksi === 'IN' ? 1 : -1) . ")")
+                    'stok' => DB::raw("stok + ({$difference} * {$multiplier})")
                 ]);
 
             Cache::forget("product_{$transaction->product_id}");
@@ -177,7 +159,7 @@ class StockTransactionController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Transaction updated successfully',
-            'data' => $transaction->load([
+            'data'    => $transaction->load([
                 'product:product_id,kode_barang,nama_barang,stok',
                 'user:user_id,username'
             ])
@@ -196,14 +178,14 @@ class StockTransactionController extends Controller
         }
 
         $multiplier = $transaction->jenis_transaksi === 'IN' ? -1 : 1;
-        
+
         Product::where('product_id', $transaction->product_id)
             ->update([
                 'stok' => DB::raw("stok + ({$transaction->jumlah} * {$multiplier})")
             ]);
 
         Cache::forget("product_{$transaction->product_id}");
-        
+
         $transaction->delete();
 
         return response()->json([
@@ -240,9 +222,9 @@ class StockTransactionController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => [
-                'product' => $product,
-                'transactions' => $transactions
+            'data'    => [
+                'product'      => $product,
+                'transactions' => $transactions,
             ]
         ]);
     }
@@ -275,18 +257,51 @@ class StockTransactionController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => [
-                'product' => $product,
-                'transactions' => $transactions
+            'data'    => [
+                'product'      => $product,
+                'transactions' => $transactions,
             ]
+        ]);
+    }
+
+    public function financeSummary(Request $request)
+    {
+        // Hitung omset, HPP, profit dari transaksi OUT (filter periode)
+        $transQuery = StockTransaction::query()
+            ->where('jenis_transaksi', 'OUT')
+            ->join('products', 'stock_transactions.product_id', '=', 'products.product_id')
+            ->selectRaw('
+                SUM(products.harga_modal * stock_transactions.jumlah) as total_modal,
+                SUM(products.harga_jual  * stock_transactions.jumlah) as total_penjualan,
+                SUM((products.harga_jual - products.harga_modal) * stock_transactions.jumlah) as total_profit
+            ');
+
+        if ($request->filled('start_date')) {
+            $transQuery->whereDate('stock_transactions.created_at', '>=', $request->start_date);
+        }
+        if ($request->filled('end_date')) {
+            $transQuery->whereDate('stock_transactions.created_at', '<=', $request->end_date);
+        }
+
+        $result = $transQuery->first();
+
+        // Nilai inventory = SUM(stok * harga_modal) dari semua produk aktif
+        // Tidak difilter periode — selalu menampilkan nilai stok saat ini
+        $inventoryResult = Product::selectRaw('SUM(stok * harga_modal) as nilai_inventory')
+            ->whereNotNull('harga_modal')
+            ->first();
+
+        return response()->json([
+            'total_modal'      => (float) ($result->total_modal         ?? 0),
+            'total_penjualan'  => (float) ($result->total_penjualan     ?? 0),
+            'total_profit'     => (float) ($result->total_profit        ?? 0),
+            'nilai_inventory'  => (float) ($inventoryResult->nilai_inventory ?? 0),
+            'period'           => $request->get('period', 'all'),
         ]);
     }
 
     public function summary(Request $request)
     {
-        DB::enableQueryLog();
-        $startTime = microtime(true);
-
         $query = StockTransaction::query();
 
         if ($request->has('start_date') && $request->has('end_date')) {
@@ -294,33 +309,19 @@ class StockTransactionController extends Controller
         }
 
         $summary = $query->selectRaw("
-            SUM(CASE WHEN jenis_transaksi = 'IN' THEN jumlah ELSE 0 END) as total_in,
-            SUM(CASE WHEN jenis_transaksi = 'OUT' THEN jumlah ELSE 0 END) as total_out,
-            COUNT(CASE WHEN jenis_transaksi = 'ADJUST' THEN 1 END) as total_adjust,
+            SUM(CASE WHEN jenis_transaksi = 'IN'     THEN jumlah ELSE 0 END) as total_in,
+            SUM(CASE WHEN jenis_transaksi = 'OUT'    THEN jumlah ELSE 0 END) as total_out,
+            COUNT(CASE WHEN jenis_transaksi = 'ADJUST' THEN 1 END)           as total_adjust,
             COUNT(*) as total_transactions
         ")->first();
 
-        $endTime = microtime(true);
-        $executionTime = ($endTime - $startTime) * 1000;
-        
-        $queries = DB::getQueryLog();
-        
-        Log::info('StockTransactionController@summary Debug:', [
-            'execution_time_ms' => round($executionTime, 2),
-            'total_queries' => count($queries)
-        ]);
-
         return response()->json([
             'success' => true,
-            'data' => [
-                'total_in' => (int) $summary->total_in,
-                'total_out' => (int) $summary->total_out,
-                'total_adjust' => (int) $summary->total_adjust,
-                'total_transactions' => (int) $summary->total_transactions
-            ],
-            'debug' => [
-                'execution_time_ms' => round($executionTime, 2),
-                'total_queries' => count($queries)
+            'data'    => [
+                'total_in'           => (int) $summary->total_in,
+                'total_out'          => (int) $summary->total_out,
+                'total_adjust'       => (int) $summary->total_adjust,
+                'total_transactions' => (int) $summary->total_transactions,
             ]
         ]);
     }

@@ -59,9 +59,11 @@ const BarangKeluarAdmin = () => {
         } else if (productsResponse?.data && Array.isArray(productsResponse.data)) {
           allProducts = productsResponse.data;
         }
+  
+        const sortedProducts = [...allProducts].sort((a, b) => b.product_id - a.product_id);
         
-        setProducts(allProducts);
-        setFilteredProducts(allProducts);
+        setProducts(sortedProducts);
+        setFilteredProducts(sortedProducts);
   
         const transactionsResponse = await stockapi.getAll({ 
           jenis_transaksi: 'OUT',

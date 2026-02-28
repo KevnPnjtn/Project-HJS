@@ -55,9 +55,11 @@ const BarangMasukAdmin = () => {
       } else if (productsResponse?.data && Array.isArray(productsResponse.data)) {
         allProducts = productsResponse.data;
       }
+
+      const sortedProducts = [...allProducts].sort((a, b) => b.product_id - a.product_id);
       
-      setProducts(allProducts);
-      setFilteredProducts(allProducts);
+      setProducts(sortedProducts);
+      setFilteredProducts(sortedProducts);
 
       const transactionsResponse = await stockapi.getAll({ 
         jenis_transaksi: 'IN',
@@ -333,7 +335,7 @@ const BarangMasukAdmin = () => {
       year: 'numeric'
     });
   };
-
+  
   if (initialLoading && transactions.length === 0) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -388,13 +390,12 @@ const BarangMasukAdmin = () => {
             />
           </div>
 
-          {/* 2. Pilih Barang - Fixed Height Box */}
+          {/* 2. Pilih Barang */}
           <div className="relative" ref={dropdownRef}>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
               Pilih Barang <span className="text-red-500">*</span>
             </label>
             
-            {/* Container dengan tinggi tetap */}
             <div className="h-[42px]">
               {!selectedProduct ? (
                 <div className="relative h-full">
@@ -453,8 +454,9 @@ const BarangMasukAdmin = () => {
                       </div>
                     ) : (
                       <>
-                        <div className="sticky top-0 bg-gray-50 px-3 py-2 border-b border-gray-200 text-xs text-gray-600 font-medium">
-                          {filteredProducts.length} produk ditemukan
+                        <div className="sticky top-0 bg-gray-50 px-3 py-2 border-b border-gray-200 text-xs text-gray-600 font-medium flex items-center justify-between">
+                          <span>{filteredProducts.length} produk ditemukan</span>
+                          <span className="text-gray-400 italic">Terbaru di atas</span>
                         </div>
                         {filteredProducts.map((product) => (
                           <div
@@ -514,7 +516,7 @@ const BarangMasukAdmin = () => {
           </div>
         </div>
 
-        {/* Product Info Card - Only shown when product is selected */}
+        {/* Product Info Card */}
         {selectedProduct && (
           <div className="mb-4 p-5 bg-gradient-to-r from-blue-50 to-blue-100 border-2 border-blue-300 rounded-xl shadow-md">
             <div className="flex items-start justify-between">
@@ -592,7 +594,7 @@ const BarangMasukAdmin = () => {
               onClick={handleExport}
               disabled={filteredTransactions.length === 0}
               className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all font-medium shadow-md hover:shadow-lg disabled:bg-gray-300 disabled:cursor-not-allowed"
-              >
+            >
               <Download className="w-5 h-5" />
               Export Excel
             </button>
