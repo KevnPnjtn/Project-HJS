@@ -17,17 +17,22 @@ const BarangKeluarUser = () => {
   });
   const [loading, setLoading] = useState(false);
   const [submitLoading, setSubmitLoading] = useState(false);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
   const [showAlert, setShowAlert] = useState({ show: false, type: '', message: '' });
 
   useEffect(() => {
-    fetchProducts();
+    fetchInitialData();
   }, []);
 
-  const fetchProducts = async () => {
+  const fetchInitialData = async () => {
     try {
       setLoading(true);
       const response = await productapi.getForDropdown({ only_available: true });
-      setProducts(response.data?.data || []);
+
+      let allProducts = response.data?.data || [];
+      allProducts = [...allProducts].sort((a, b) => b.product_id - a.product_id);
+
+      setProducts(allProducts);
     } catch (error) {
       console.error('Error fetching products:', error);
       showAlertMessage('error', 'Gagal memuat data produk');
@@ -88,8 +93,11 @@ const BarangKeluarUser = () => {
 
       await stockapi.create(payload);
 
+      setSubmitSuccess(true);
+      setTimeout(() => setSubmitSuccess(false), 2000);
+
       showAlertMessage('success', 'Barang keluar berhasil ditambahkan');
- 
+
       setFormData({
         product_id: '',
         jumlah: '',
@@ -97,8 +105,8 @@ const BarangKeluarUser = () => {
         penanggung_jawab: ''
       });
       setSelectedProduct(null);
-       
-      fetchProducts();
+
+      fetchInitialData();
 
     } catch (error) {
       console.error('Error submitting:', error);
@@ -116,6 +124,13 @@ const BarangKeluarUser = () => {
       penanggung_jawab: ''
     });
     setSelectedProduct(null);
+  };
+
+  const getButtonStyle = () => {
+    if (submitSuccess)    return 'bg-green-500 hover:bg-green-500 scale-95';
+    if (submitLoading)    return 'bg-red-500 opacity-80 cursor-not-allowed';
+    if (!selectedProduct) return 'bg-red-600 opacity-50 cursor-not-allowed';
+    return 'bg-red-600 hover:bg-red-700 active:scale-95';
   };
 
   return (
@@ -301,13 +316,18 @@ const BarangKeluarUser = () => {
             </button>
             <button
               type="submit"
-              disabled={submitLoading || !selectedProduct}
-              className="flex-1 px-6 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              disabled={submitLoading || submitSuccess || !selectedProduct}
+              className={`flex-1 px-6 py-3 text-white rounded-xl font-medium flex items-center justify-center gap-2 transition-all duration-200 ${getButtonStyle()}`}
             >
               {submitLoading ? (
                 <>
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white" />
                   <span>Memproses...</span>
+                </>
+              ) : submitSuccess ? (
+                <>
+                  <CheckCircle className="w-5 h-5 animate-bounce" />
+                  <span>Berhasil!</span>
                 </>
               ) : (
                 <>

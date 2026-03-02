@@ -266,7 +266,6 @@ class StockTransactionController extends Controller
 
     public function financeSummary(Request $request)
     {
-        // Hitung omset, HPP, profit dari transaksi OUT (filter periode)
         $transQuery = StockTransaction::query()
             ->where('jenis_transaksi', 'OUT')
             ->join('products', 'stock_transactions.product_id', '=', 'products.product_id')
@@ -285,8 +284,6 @@ class StockTransactionController extends Controller
 
         $result = $transQuery->first();
 
-        // Nilai inventory = SUM(stok * harga_modal) dari semua produk aktif
-        // Tidak difilter periode — selalu menampilkan nilai stok saat ini
         $inventoryResult = Product::selectRaw('SUM(stok * harga_modal) as nilai_inventory')
             ->whereNotNull('harga_modal')
             ->first();
@@ -315,13 +312,16 @@ class StockTransactionController extends Controller
             COUNT(*) as total_transactions
         ")->first();
 
+        $transaksiHariIni = StockTransaction::whereDate('created_at', today())->count();
+
         return response()->json([
             'success' => true,
             'data'    => [
-                'total_in'           => (int) $summary->total_in,
-                'total_out'          => (int) $summary->total_out,
-                'total_adjust'       => (int) $summary->total_adjust,
-                'total_transactions' => (int) $summary->total_transactions,
+                'total_in'            => (int) $summary->total_in,
+                'total_out'           => (int) $summary->total_out,
+                'total_adjust'        => (int) $summary->total_adjust,
+                'total_transactions'  => (int) $summary->total_transactions,
+                'transaksi_hari_ini'  => (int) $transaksiHariIni,
             ]
         ]);
     }

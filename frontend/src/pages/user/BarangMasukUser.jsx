@@ -17,17 +17,22 @@ const BarangMasukUser = () => {
   });
   const [loading, setLoading] = useState(false);
   const [submitLoading, setSubmitLoading] = useState(false);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
   const [showAlert, setShowAlert] = useState({ show: false, type: '', message: '' });
 
   useEffect(() => {
-    fetchProducts();
+    fetchInitialData();
   }, []);
 
-  const fetchProducts = async () => {
+  const fetchInitialData = async () => {
     try {
       setLoading(true);
       const response = await productapi.getForDropdown({ only_available: false });
-      setProducts(response.data?.data || []);
+
+      let allProducts = response.data?.data || [];
+      allProducts = [...allProducts].sort((a, b) => b.product_id - a.product_id);
+
+      setProducts(allProducts);
     } catch (error) {
       console.error('Error fetching products:', error);
       showAlertMessage('error', 'Gagal memuat data produk');
@@ -83,8 +88,11 @@ const BarangMasukUser = () => {
 
       await stockapi.create(payload);
 
+      setSubmitSuccess(true);
+      setTimeout(() => setSubmitSuccess(false), 2000);
+
       showAlertMessage('success', 'Barang masuk berhasil ditambahkan');
- 
+
       setFormData({
         product_id: '',
         jumlah: '',
@@ -111,13 +119,20 @@ const BarangMasukUser = () => {
     setSelectedProduct(null);
   };
 
+  const getButtonStyle = () => {
+    if (submitSuccess)  return 'bg-green-500 hover:bg-green-500 scale-95';
+    if (submitLoading)  return 'bg-blue-500 opacity-80 cursor-not-allowed';
+    if (!selectedProduct) return 'bg-blue-600 opacity-50 cursor-not-allowed';
+    return 'bg-blue-600 hover:bg-blue-700 active:scale-95';
+  };
+
   return (
     <div className="space-y-6">
       {/* Alert */}
       {showAlert.show && (
         <div className={`rounded-xl p-4 border ${
-          showAlert.type === 'success' 
-            ? 'bg-green-50 border-green-200' 
+          showAlert.type === 'success'
+            ? 'bg-green-50 border-green-200'
             : 'bg-red-50 border-red-200'
         }`}>
           <div className="flex items-center gap-3">
@@ -151,7 +166,7 @@ const BarangMasukUser = () => {
       {/* Form */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <form onSubmit={handleSubmit} className="space-y-6">
-          
+
           {/* Select Product Dropdown */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -286,13 +301,18 @@ const BarangMasukUser = () => {
             </button>
             <button
               type="submit"
-              disabled={submitLoading || !selectedProduct}
-              className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              disabled={submitLoading || submitSuccess || !selectedProduct}
+              className={`flex-1 px-6 py-3 text-white rounded-xl font-medium flex items-center justify-center gap-2 transition-all duration-200 ${getButtonStyle()}`}
             >
               {submitLoading ? (
                 <>
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white" />
                   <span>Memproses...</span>
+                </>
+              ) : submitSuccess ? (
+                <>
+                  <CheckCircle className="w-5 h-5 animate-bounce" />
+                  <span>Berhasil!</span>
                 </>
               ) : (
                 <>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Package, Archive, ShoppingCart, AlertTriangle,
   TrendingUp, ArrowUpCircle, ArrowDownCircle,
@@ -31,7 +31,6 @@ const formatDate = (dateString) =>
     hour: '2-digit', minute: '2-digit',
   });
 
-// ─── Sub-components ──────────────────────────────────────────
 
 const StatCard = ({ title, value, IconComponent, iconColor, bgColor }) => (
   <div className={`${bgColor} rounded-xl shadow-md p-6 border border-gray-200 hover:shadow-lg transition-all hover:-translate-y-1`}>
@@ -45,25 +44,46 @@ const StatCard = ({ title, value, IconComponent, iconColor, bgColor }) => (
   </div>
 );
 
-const PeriodSelector = ({ value, onChange, options, activeClass = 'bg-indigo-600' }) => (
+const PeriodSelector = ({ value, onChange, options, activeClass = 'bg-indigo-600', loading = false }) => (
   <div className="flex items-center gap-2 flex-wrap">
     {options.map((opt) => (
       <button
         key={opt.value}
         onClick={() => onChange(opt.value)}
-        className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+        disabled={loading}
+        className={`px-4 py-2 rounded-lg font-medium text-sm transition-all flex items-center gap-1.5 disabled:cursor-not-allowed ${
           value === opt.value
             ? `${activeClass} text-white shadow-md`
             : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
         }`}
       >
+        {loading && value === opt.value && (
+          <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+        )}
         {opt.label}
       </button>
     ))}
   </div>
 );
 
-// ─── Main Component ───────────────────────────────────────────
+const getPeriodDates = (period) => {
+  const now   = new Date();
+  const pad   = (n) => String(n).padStart(2, '0');
+  const fmt   = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  if (period === 'today') return { startDate: fmt(today), endDate: fmt(now) };
+  if (period === 'week') {
+    const ws = new Date(today);
+    ws.setDate(today.getDate() - today.getDay());
+    return { startDate: fmt(ws), endDate: fmt(now) };
+  }
+  if (period === 'month')
+    return { startDate: fmt(new Date(now.getFullYear(), now.getMonth(), 1)), endDate: fmt(now) };
+  if (period === 'year')
+    return { startDate: `${now.getFullYear()}-01-01`, endDate: `${now.getFullYear()}-12-31` };
+  return { startDate: null, endDate: null };
+};
 
 const DashboardPageAdmin = () => {
   const [loading, setLoading]   = useState(true);
@@ -73,24 +93,20 @@ const DashboardPageAdmin = () => {
     totalStockOut: 0,
     lowStockProducts: 0,
   });
+  const statsRef = useRef(stats);
+  const financeCacheRef = useRef({});
+  const stockCacheRef   = useRef({});
   const [recentTransactions, setRecentTransactions] = useState([]);
   const [lowStockItems, setLowStockItems]           = useState([]);
-
-  // ── Finance state ──
   const [financePeriod, setFinancePeriod] = useState('month');
   const [financeStats, setFinanceStats]   = useState({
     totalModal: 0, totalPenjualan: 0, totalProfit: 0, nilaiInventory: 0,
   });
   const [financeLoading, setFinanceLoading] = useState(false);
-
-  // ── Stock summary state ──
   const [stockPeriod, setStockPeriod]   = useState('all');
   const [stockSummary, setStockSummary] = useState({ totalIn: 0, totalOut: 0 });
   const [stockLoading, setStockLoading] = useState(false);
 
-  // ─────────────────────────────────────────────────────────
-  // FETCH 1: Dashboard data — 4 ringan, paralel
-  // ─────────────────────────────────────────────────────────
   const fetchDashboardData = useCallback(async () => {
     try {
       setLoading(true);
@@ -101,24 +117,26 @@ const DashboardPageAdmin = () => {
         productapi.getAll({ per_page: 1 }),
       ]);
 
-      const summary      = summaryRes.data;
+      const summary      = summaryRes.data?.data ?? summaryRes.data;
       const lowStockData = lowStockRes.data || lowStockRes;
       const lowStockList = lowStockData.data || [];
       const recentData   = recentRes.data?.data || [];
       const countData    = countRes.data || countRes;
 
-      setStats({
+      const newStats = {
         totalProducts:    countData.total || 0,
         totalStockIn:     summary?.total_in  || 0,
         totalStockOut:    summary?.total_out || 0,
         lowStockProducts: lowStockData.total || lowStockList.length,
-      });
+      };
+      statsRef.current = newStats;
+      setStats(newStats);
       setRecentTransactions(recentData);
       setLowStockItems(lowStockList.slice(0, 5));
-      setStockSummary({
-        totalIn:  summary?.total_in  || 0,
-        totalOut: summary?.total_out || 0,
-      });
+
+      const allStockData = { totalIn: summary?.total_in || 0, totalOut: summary?.total_out || 0 };
+      stockCacheRef.current['all'] = allStockData;
+      setStockSummary(allStockData);
     } catch (err) {
       console.error('Dashboard fetch error:', err);
     } finally {
@@ -126,10 +144,11 @@ const DashboardPageAdmin = () => {
     }
   }, []);
 
-  // ─────────────────────────────────────────────────────────
-  // FETCH 2: Finance summary — agregasi di backend (1 request, ~1 kB)
-  // ─────────────────────────────────────────────────────────
   const fetchFinanceData = useCallback(async (period) => {
+    if (financeCacheRef.current[period]) {
+      setFinanceStats(financeCacheRef.current[period]);
+      return;
+    }
     try {
       setFinanceLoading(true);
       const { startDate, endDate } = getPeriodDates(period);
@@ -139,12 +158,14 @@ const DashboardPageAdmin = () => {
         ...(endDate   && { end_date:   endDate   }),
       });
       const d = res.data;
-      setFinanceStats({
+      const result = {
         totalModal:     d.total_modal     || 0,
         totalPenjualan: d.total_penjualan || 0,
         totalProfit:    d.total_profit    || 0,
         nilaiInventory: d.nilai_inventory || 0,
-      });
+      };
+      financeCacheRef.current[period] = result;
+      setFinanceStats(result);
     } catch (err) {
       console.error('fetchFinanceData error:', err);
     } finally {
@@ -152,18 +173,15 @@ const DashboardPageAdmin = () => {
     }
   }, []);
 
-
-
-  // ─────────────────────────────────────────────────────────
-  // FETCH 3: Stock period summary — pakai getSummary dengan date params
-  // ─────────────────────────────────────────────────────────
   const fetchStockPeriodSummary = useCallback(async (period) => {
+    if (stockCacheRef.current[period]) {
+      setStockSummary(stockCacheRef.current[period]);
+      return;
+    }
     if (period === 'all') {
-      // Sudah ada dari fetchDashboardData, tidak perlu request baru
-      setStockSummary({
-        totalIn:  stats.totalStockIn,
-        totalOut: stats.totalStockOut,
-      });
+      const data = { totalIn: statsRef.current.totalStockIn, totalOut: statsRef.current.totalStockOut };
+      stockCacheRef.current['all'] = data;
+      setStockSummary(data);
       return;
     }
     try {
@@ -173,20 +191,20 @@ const DashboardPageAdmin = () => {
         start_date: startDate,
         end_date:   endDate,
       });
-      const d = res.data;
-      setStockSummary({ totalIn: d?.total_in || 0, totalOut: d?.total_out || 0 });
+      const d = res.data?.data ?? res.data;
+      const result = { totalIn: d?.total_in || 0, totalOut: d?.total_out || 0 };
+      stockCacheRef.current[period] = result;
+      setStockSummary(result);
     } catch (err) {
       console.error('Stock period error:', err);
     } finally {
       setStockLoading(false);
     }
-  }, [stats.totalStockIn, stats.totalStockOut]);
+  }, []);
 
-  // ─────────────────────────────────────────────────────────
-  // Effects
-  // ─────────────────────────────────────────────────────────
   useEffect(() => {
-    Promise.all([fetchDashboardData(), fetchFinanceData('month')]);
+    fetchDashboardData();
+    fetchFinanceData('month');
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleFinancePeriodChange = (period) => {
@@ -197,28 +215,6 @@ const DashboardPageAdmin = () => {
   const handleStockPeriodChange = (period) => {
     setStockPeriod(period);
     fetchStockPeriodSummary(period);
-  };
-
-  // ─────────────────────────────────────────────────────────
-  // Helpers
-  // ─────────────────────────────────────────────────────────
-  const getPeriodDates = (period) => {
-    const now   = new Date();
-    const pad   = (n) => String(n).padStart(2, '0');
-    const fmt   = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-    if (period === 'today') return { startDate: fmt(today), endDate: fmt(now) };
-    if (period === 'week') {
-      const ws = new Date(today);
-      ws.setDate(today.getDate() - today.getDay());
-      return { startDate: fmt(ws), endDate: fmt(now) };
-    }
-    if (period === 'month')
-      return { startDate: fmt(new Date(now.getFullYear(), now.getMonth(), 1)), endDate: fmt(now) };
-    if (period === 'year')
-      return { startDate: `${now.getFullYear()}-01-01`, endDate: `${now.getFullYear()}-12-31` };
-    return { startDate: null, endDate: null };
   };
 
   const totalStokTersedia = stats.totalStockIn - stats.totalStockOut;
@@ -306,6 +302,7 @@ const DashboardPageAdmin = () => {
               onChange={handleFinancePeriodChange}
               options={financePeriodOptions}
               activeClass="bg-green-600"
+              loading={financeLoading}
             />
           </div>
         </div>

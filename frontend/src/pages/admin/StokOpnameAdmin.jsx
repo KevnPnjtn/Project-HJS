@@ -54,7 +54,6 @@ const StokOpnameAdmin = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [selectedProduct]);
 
-  // Fetch produk + opname paralel, produk diurutkan terbaru (product_id terbesar) dulu
   const fetchInitialData = async () => {
     try {
       setInitialLoading(true);
@@ -65,16 +64,13 @@ const StokOpnameAdmin = () => {
         stockopnameapi.getAll()
       ]);
 
-      // Normalisasi array produk
       let allProducts = productsResponse.data?.data || productsResponse.data || [];
       if (!Array.isArray(allProducts)) allProducts = [];
 
-      // Urutkan terbaru ke lama (sama seperti BarangMasukAdmin)
       const sortedProducts = [...allProducts].sort((a, b) => b.product_id - a.product_id);
       setProducts(sortedProducts);
       setFilteredProducts(sortedProducts);
 
-      // Opname list
       const opnameList = opnamesResponse.data?.data || [];
       setOpnames(opnameList);
 
@@ -86,7 +82,6 @@ const StokOpnameAdmin = () => {
     }
   };
 
-  // Helper — refresh hanya opname (setelah simpan/hapus/adjust)
   const fetchOpnames = async () => {
     try {
       setLoading(true);
@@ -100,7 +95,6 @@ const StokOpnameAdmin = () => {
     }
   };
 
-  // Helper — refresh hanya produk (setelah simpan/adjust yang mengubah stok)
   const fetchProducts = async () => {
     try {
       setLoading(true);

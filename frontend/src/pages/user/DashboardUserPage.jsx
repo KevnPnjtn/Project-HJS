@@ -24,33 +24,28 @@ const DashboardUserPage = ({ onNavigate }) => {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-       
-      const summaryResponse = await stockapi.getSummary();
-      const summaryData = summaryResponse.data || {};
-       
-      const allTransactionsResponse = await stockapi.getAll({ per_page: 1000 });
-      const allTransactions = allTransactionsResponse.data?.data || []; 
-      const sortedTransactions = allTransactions.sort(
-        (a, b) => new Date(b.created_at) - new Date(a.created_at)
-      );
-       
-      const today = new Date().toDateString();
-      const transaksiHariIni = sortedTransactions.filter(
-        t => new Date(t.created_at).toDateString() === today
-      ).length;
-       
-      const totalMasuk = summaryData.total_in || 0;
+
+      // 2 request paralel — summary sudah include transaksi_hari_ini dari backend
+      const [summaryRes, recentRes] = await Promise.all([
+        stockapi.getSummary(),
+        stockapi.getAll({ per_page: 10 }),
+      ]);
+
+      const summaryData = summaryRes.data?.data ?? summaryRes.data ?? {};
+      const recentData  = recentRes.data?.data || [];
+
+      const totalMasuk  = summaryData.total_in  || 0;
       const totalKeluar = summaryData.total_out || 0;
-      
+
       setStats({
         totalMasuk,
         totalKeluar,
-        transaksiHariIni,
-        perubahanStok: totalMasuk - totalKeluar
+        transaksiHariIni: summaryData.transaksi_hari_ini || 0,
+        perubahanStok:    totalMasuk - totalKeluar,
       });
-       
-      setRecentTransactions(sortedTransactions.slice(0, 10));
-      
+
+      setRecentTransactions(recentData);
+
     } catch (error) {
       console.error('Gagal mengambil data dashboard:', error);
     } finally {
@@ -68,7 +63,7 @@ const DashboardUserPage = ({ onNavigate }) => {
       minute: '2-digit'
     });
   };
- 
+
   const filteredTransactions = recentTransactions.filter(transaction => {
     if (activeTab === 'semua') return true;
     if (activeTab === 'masuk') return transaction.jenis_transaksi === 'IN';
@@ -202,36 +197,19 @@ const DashboardUserPage = ({ onNavigate }) => {
         
         {/* Tabs */}
         <div className="flex gap-2 mb-4 border-b border-gray-200">
-          <button 
-            onClick={() => setActiveTab('semua')}
-            className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
-              activeTab === 'semua' 
-                ? 'text-white bg-purple-600' 
-                : 'text-gray-600 hover:bg-gray-50'
-            }`}
-          >
-            Semua
-          </button>
-          <button 
-            onClick={() => setActiveTab('masuk')}
-            className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
-              activeTab === 'masuk' 
-                ? 'text-white bg-purple-600' 
-                : 'text-gray-600 hover:bg-gray-50'
-            }`}
-          >
-            Masuk
-          </button>
-          <button 
-            onClick={() => setActiveTab('keluar')}
-            className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
-              activeTab === 'keluar' 
-                ? 'text-white bg-purple-600' 
-                : 'text-gray-600 hover:bg-gray-50'
-            }`}
-          >
-            Keluar
-          </button>
+          {['semua', 'masuk', 'keluar'].map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors capitalize ${
+                activeTab === tab
+                  ? 'text-white bg-purple-600'
+                  : 'text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+            </button>
+          ))}
         </div>
 
         {/* Transaction List */}
@@ -249,9 +227,7 @@ const DashboardUserPage = ({ onNavigate }) => {
               >
                 <div className="flex items-center gap-4">
                   <div className={`p-3 rounded-xl ${
-                    transaction.jenis_transaksi === 'IN' 
-                      ? 'bg-blue-50' 
-                      : 'bg-red-50'
+                    transaction.jenis_transaksi === 'IN' ? 'bg-blue-50' : 'bg-red-50'
                   }`}>
                     {transaction.jenis_transaksi === 'IN' ? (
                       <PackagePlus className="w-5 h-5 text-blue-600" />
