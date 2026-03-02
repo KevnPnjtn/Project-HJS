@@ -36,7 +36,8 @@ class StockTransactionController extends Controller
         }
 
         if ($request->has('start_date') && $request->has('end_date')) {
-            $query->whereBetween('created_at', [$request->start_date, $request->end_date]);
+            $query->whereDate('created_at', '>=', $request->start_date)
+                  ->whereDate('created_at', '<=', $request->end_date);
         }
 
         if ($request->has('penanggung_jawab') && $request->penanggung_jawab) {
@@ -139,8 +140,8 @@ class StockTransactionController extends Controller
             ], 422);
         }
 
-        $oldJumlah  = $transaction->jumlah;
-        $newJumlah  = $request->jumlah ?? $oldJumlah;
+        $oldJumlah = $transaction->jumlah;
+        $newJumlah = $request->jumlah ?? $oldJumlah;
 
         $transaction->update($request->only(['jumlah', 'catatan', 'penanggung_jawab']));
 
@@ -289,9 +290,9 @@ class StockTransactionController extends Controller
             ->first();
 
         return response()->json([
-            'total_modal'      => (float) ($result->total_modal         ?? 0),
-            'total_penjualan'  => (float) ($result->total_penjualan     ?? 0),
-            'total_profit'     => (float) ($result->total_profit        ?? 0),
+            'total_modal'      => (float) ($result->total_modal             ?? 0),
+            'total_penjualan'  => (float) ($result->total_penjualan         ?? 0),
+            'total_profit'     => (float) ($result->total_profit            ?? 0),
             'nilai_inventory'  => (float) ($inventoryResult->nilai_inventory ?? 0),
             'period'           => $request->get('period', 'all'),
         ]);
@@ -302,13 +303,14 @@ class StockTransactionController extends Controller
         $query = StockTransaction::query();
 
         if ($request->has('start_date') && $request->has('end_date')) {
-            $query->whereBetween('created_at', [$request->start_date, $request->end_date]);
+            $query->whereDate('created_at', '>=', $request->start_date)
+                  ->whereDate('created_at', '<=', $request->end_date);
         }
 
         $summary = $query->selectRaw("
-            SUM(CASE WHEN jenis_transaksi = 'IN'     THEN jumlah ELSE 0 END) as total_in,
-            SUM(CASE WHEN jenis_transaksi = 'OUT'    THEN jumlah ELSE 0 END) as total_out,
-            COUNT(CASE WHEN jenis_transaksi = 'ADJUST' THEN 1 END)           as total_adjust,
+            SUM(CASE WHEN jenis_transaksi = 'IN'       THEN jumlah ELSE 0 END) as total_in,
+            SUM(CASE WHEN jenis_transaksi = 'OUT'      THEN jumlah ELSE 0 END) as total_out,
+            COUNT(CASE WHEN jenis_transaksi = 'ADJUST' THEN 1 END)             as total_adjust,
             COUNT(*) as total_transactions
         ")->first();
 
@@ -317,11 +319,11 @@ class StockTransactionController extends Controller
         return response()->json([
             'success' => true,
             'data'    => [
-                'total_in'            => (int) $summary->total_in,
-                'total_out'           => (int) $summary->total_out,
-                'total_adjust'        => (int) $summary->total_adjust,
-                'total_transactions'  => (int) $summary->total_transactions,
-                'transaksi_hari_ini'  => (int) $transaksiHariIni,
+                'total_in'           => (int) $summary->total_in,
+                'total_out'          => (int) $summary->total_out,
+                'total_adjust'       => (int) $summary->total_adjust,
+                'total_transactions' => (int) $summary->total_transactions,
+                'transaksi_hari_ini' => (int) $transaksiHariIni,
             ]
         ]);
     }

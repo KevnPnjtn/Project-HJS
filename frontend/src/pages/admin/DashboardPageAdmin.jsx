@@ -94,8 +94,6 @@ const DashboardPageAdmin = () => {
     lowStockProducts: 0,
   });
   const statsRef = useRef(stats);
-  const financeCacheRef = useRef({});
-  const stockCacheRef   = useRef({});
   const [recentTransactions, setRecentTransactions] = useState([]);
   const [lowStockItems, setLowStockItems]           = useState([]);
   const [financePeriod, setFinancePeriod] = useState('month');
@@ -116,11 +114,10 @@ const DashboardPageAdmin = () => {
         stockapi.getAll({ per_page: 10 }),
         productapi.getAll({ per_page: 1 }),
       ]);
-
-      const summary      = summaryRes.data?.data ?? summaryRes.data;
+      const summary      = summaryRes?.data ?? summaryRes;
       const lowStockData = lowStockRes.data || lowStockRes;
       const lowStockList = lowStockData.data || [];
-      const recentData   = recentRes.data?.data || [];
+      const recentData   = recentRes.data?.data || recentRes.data || [];
       const countData    = countRes.data || countRes;
 
       const newStats = {
@@ -134,9 +131,15 @@ const DashboardPageAdmin = () => {
       setRecentTransactions(recentData);
       setLowStockItems(lowStockList.slice(0, 5));
 
-      const allStockData = { totalIn: summary?.total_in || 0, totalOut: summary?.total_out || 0 };
-      stockCacheRef.current['all'] = allStockData;
-      setStockSummary(allStockData);
+      setStockPeriod(prev => {
+        if (prev === 'all') {
+          setStockSummary({
+            totalIn:  summary?.total_in  || 0,
+            totalOut: summary?.total_out || 0,
+          });
+        }
+        return prev;
+      });
     } catch (err) {
       console.error('Dashboard fetch error:', err);
     } finally {
@@ -145,10 +148,6 @@ const DashboardPageAdmin = () => {
   }, []);
 
   const fetchFinanceData = useCallback(async (period) => {
-    if (financeCacheRef.current[period]) {
-      setFinanceStats(financeCacheRef.current[period]);
-      return;
-    }
     try {
       setFinanceLoading(true);
       const { startDate, endDate } = getPeriodDates(period);
@@ -164,7 +163,6 @@ const DashboardPageAdmin = () => {
         totalProfit:    d.total_profit    || 0,
         nilaiInventory: d.nilai_inventory || 0,
       };
-      financeCacheRef.current[period] = result;
       setFinanceStats(result);
     } catch (err) {
       console.error('fetchFinanceData error:', err);
@@ -173,32 +171,43 @@ const DashboardPageAdmin = () => {
     }
   }, []);
 
-  const fetchStockPeriodSummary = useCallback(async (period) => {
-    if (stockCacheRef.current[period]) {
-      setStockSummary(stockCacheRef.current[period]);
-      return;
-    }
-    if (period === 'all') {
-      const data = { totalIn: statsRef.current.totalStockIn, totalOut: statsRef.current.totalStockOut };
-      stockCacheRef.current['all'] = data;
-      setStockSummary(data);
-      return;
-    }
+  // FIX: fetchStockPeriodSummary selalu fetch dari API, tanpa cache
+  const fetchStockPeriodSummary = useCallback(async (period, skipLoading = false) => {
     try {
-      setStockLoading(true);
+      if (!skipLoading) setStockLoading(true);
+
+      if (period === 'all') {
+        stockapi.clearCache(); // paksa fresh data
+        const res = await stockapi.getSummary();
+        // getSummary mengembalikan response.data langsung (bukan axios response)
+        const d = res?.data ?? res;
+        setStockSummary({
+          totalIn:  d?.total_in  || 0,
+          totalOut: d?.total_out || 0,
+        });
+        statsRef.current = {
+          ...statsRef.current,
+          totalStockIn:  d?.total_in  || 0,
+          totalStockOut: d?.total_out || 0,
+        };
+        return;
+      }
+
       const { startDate, endDate } = getPeriodDates(period);
+      stockapi.clearCache();
       const res = await stockapi.getSummary({
         start_date: startDate,
         end_date:   endDate,
       });
-      const d = res.data?.data ?? res.data;
-      const result = { totalIn: d?.total_in || 0, totalOut: d?.total_out || 0 };
-      stockCacheRef.current[period] = result;
-      setStockSummary(result);
+      const d = res?.data ?? res;
+      setStockSummary({
+        totalIn:  d?.total_in  || 0,
+        totalOut: d?.total_out || 0,
+      });
     } catch (err) {
       console.error('Stock period error:', err);
     } finally {
-      setStockLoading(false);
+      if (!skipLoading) setStockLoading(false);
     }
   }, []);
 
@@ -225,9 +234,6 @@ const DashboardPageAdmin = () => {
   const stockPeriodOptions  = ['today','week','month','all'].map(v => ({ value: v, label: PERIOD_LABELS[v] }));
   const financePeriodOptions = ['today','week','month','year','all'].map(v => ({ value: v, label: PERIOD_LABELS[v] }));
 
-  // ─────────────────────────────────────────────────────────
-  // Render
-  // ─────────────────────────────────────────────────────────
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">

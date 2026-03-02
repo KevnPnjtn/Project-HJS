@@ -77,8 +77,18 @@ const KartuStokAdmin = () => {
       } else if (Array.isArray(response)) {
         productList = response;
       }
-      setProducts(productList);
-      setFilteredProducts(productList);
+
+      // Urutkan dari yang terbaru ke yang terlama
+      const sortedList = [...productList].sort((a, b) => {
+        if (a.created_at && b.created_at) {
+          return new Date(b.created_at) - new Date(a.created_at);
+        }
+        // Fallback: urutkan berdasarkan product_id descending jika created_at tidak tersedia
+        return (b.product_id || 0) - (a.product_id || 0);
+      });
+
+      setProducts(sortedList);
+      setFilteredProducts(sortedList);
     } catch (err) {
       console.error('Error fetching products:', err);
     }
@@ -655,11 +665,11 @@ const KartuStokAdmin = () => {
                   <p className="font-semibold flex items-center gap-2">
                     <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
                     Menampilkan {transactions.length} transaksi dari {formatDateLong(filters.tanggal_mulai)}
-              </p>
+                  </p>
+                </div>
+              )}
             </div>
-          )}
-        </div>
-      )}  
+          )}  
         </div>
       </div>
     </>
