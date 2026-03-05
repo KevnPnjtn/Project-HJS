@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Save, RotateCcw, ClipboardCheck, AlertCircle, Download, CheckCircle, XCircle, ChevronDown, X, PackageMinus } from 'lucide-react';
+import { Search, Save, RotateCcw, ClipboardCheck, Download, CheckCircle, XCircle, ChevronDown, X, PackageMinus, AlertCircle, Trash2 } from 'lucide-react';
+import { GlobalStyles, ToastContainer, ConfirmModal } from '../../components/ui/SharedComponents';
+import { useToast, useConfirm } from '../../components/ui/sharedHooks';
 import { productapi } from '../../services/productapi';
 import { stockopnameapi } from '../../services/stockopnameapi';
 import * as XLSX from 'xlsx';
@@ -28,20 +30,13 @@ const StokOpnameAdmin = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
 
-  useEffect(() => {
-    fetchInitialData();
-  }, []);
+  const toast = useToast();
+  const { confirm, confirmProps } = useConfirm();
 
-  useEffect(() => {
-    filterOpnames();
-  }, [searchTerm, statusFilter, opnames]);
-
-  useEffect(() => {
-    filterProductDropdown();
-  }, [searchProduct, products]);
+  useEffect(() => { fetchInitialData(); }, []);
+  useEffect(() => { filterOpnames(); }, [searchTerm, statusFilter, opnames]);
+  useEffect(() => { filterProductDropdown(); }, [searchProduct, products]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -57,8 +52,6 @@ const StokOpnameAdmin = () => {
   const fetchInitialData = async () => {
     try {
       setInitialLoading(true);
-      setError('');
-
       const [productsResponse, opnamesResponse] = await Promise.all([
         productapi.getForDropdown(),
         stockopnameapi.getAll()
@@ -70,13 +63,10 @@ const StokOpnameAdmin = () => {
       const sortedProducts = [...allProducts].sort((a, b) => b.product_id - a.product_id);
       setProducts(sortedProducts);
       setFilteredProducts(sortedProducts);
-
-      const opnameList = opnamesResponse.data?.data || [];
-      setOpnames(opnameList);
+      setOpnames(opnamesResponse.data?.data || []);
 
     } catch (err) {
-      console.error('Error:', err);
-      setError('Gagal memuat data');
+      toast.error(err.response?.data?.message || 'Gagal memuat data.', 'Error');
     } finally {
       setInitialLoading(false);
     }
@@ -84,20 +74,15 @@ const StokOpnameAdmin = () => {
 
   const fetchOpnames = async () => {
     try {
-      setLoading(true);
       const response = await stockopnameapi.getAll();
       setOpnames(response.data?.data || []);
     } catch (err) {
-      console.error('Error:', err);
-      setError('Gagal memuat opname');
-    } finally {
-      setLoading(false);
+      toast.error(err.response?.data?.message || 'Gagal memuat opname.', 'Error');
     }
   };
 
   const fetchProducts = async () => {
     try {
-      setLoading(true);
       const response = await productapi.getForDropdown();
       let allProducts = response.data?.data || response.data || [];
       if (!Array.isArray(allProducts)) allProducts = [];
@@ -105,18 +90,12 @@ const StokOpnameAdmin = () => {
       setProducts(sortedProducts);
       setFilteredProducts(sortedProducts);
     } catch (err) {
-      console.error('Error:', err);
-      setError('Gagal memuat produk');
-    } finally {
-      setLoading(false);
+      toast.error(err.response?.data?.message || 'Gagal memuat produk.', 'Error');
     }
   };
 
   const filterProductDropdown = () => {
-    if (!searchProduct.trim()) {
-      setFilteredProducts(products);
-      return;
-    }
+    if (!searchProduct.trim()) { setFilteredProducts(products); return; }
     const q = searchProduct.toLowerCase();
     setFilteredProducts(products.filter(p =>
       p.nama_barang?.toLowerCase().includes(q) ||
@@ -164,27 +143,22 @@ const StokOpnameAdmin = () => {
   };
 
   const handleSimpan = async () => {
-    setError('');
-    setSuccess('');
-    if (!formData.tanggal_opname) return setError('Tanggal harus diisi!');
-    if (!selectedProduct) return setError('Pilih produk!');
-    if (formData.stok_fisik === '') return setError('Stok fisik harus diisi!');
+    if (!formData.tanggal_opname) return toast.error('Tanggal harus diisi!');
+    if (!selectedProduct) return toast.error('Pilih produk terlebih dahulu!');
+    if (formData.stok_fisik === '') return toast.error('Stok fisik harus diisi!');
 
     try {
       setLoading(true);
+      await stockopnameapi.create({
+        product_id:      parseInt(selectedProduct.product_id),
+        tanggal_opname:  formData.tanggal_opname,
+        stok_fisik:      parseInt(formData.stok_fisik),
+        nama_petugas:    formData.nama_petugas || null,
+        catatan:         formData.catatan || null,
+        sesuaikan_stok:  formData.sesuaikan_stok
+      });
 
-      const dataToSubmit = {
-        product_id: parseInt(selectedProduct.product_id),
-        tanggal_opname: formData.tanggal_opname,
-        stok_fisik: parseInt(formData.stok_fisik),
-        nama_petugas: formData.nama_petugas || null,
-        catatan: formData.catatan || null,
-        sesuaikan_stok: formData.sesuaikan_stok
-      };
-
-      await stockopnameapi.create(dataToSubmit);
-
-      setSuccess('✅ Stok opname berhasil disimpan!');
+      toast.success('Stok opname berhasil disimpan!', 'Berhasil');
 
       setTimeout(() => {
         handleReset();
@@ -192,45 +166,52 @@ const StokOpnameAdmin = () => {
         fetchProducts();
       }, 1000);
     } catch (err) {
-      console.error('Error:', err);
-      setError(err.response?.data?.message || 'Gagal menyimpan');
+      toast.error(err.response?.data?.message || 'Gagal menyimpan.', 'Error');
     } finally {
       setLoading(false);
     }
   };
 
   const handleAdjustStock = async (opnameId) => {
-    if (!window.confirm('Yakin mau sesuaikan stok?')) return;
+    const ok = await confirm({
+      title:        'Sesuaikan Stok',
+      message:      'Stok di sistem akan disesuaikan dengan hasil hitung fisik. Tindakan ini tidak dapat dibatalkan.',
+      confirmText:  'Sesuaikan',
+      confirmColor: 'blue',
+      icon:         CheckCircle,
+    });
+    if (!ok) return;
 
     try {
       setLoading(true);
       await stockopnameapi.adjustStock(opnameId);
-      setSuccess('✅ Stok berhasil disesuaikan!');
-      
+      toast.success('Stok berhasil disesuaikan!', 'Berhasil');
       fetchOpnames();
       fetchProducts();
-      
-      setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
-      setError(err.response?.data?.message || 'Gagal sesuaikan stok');
+      toast.error(err.response?.data?.message || 'Gagal sesuaikan stok.', 'Error');
     } finally {
       setLoading(false);
     }
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Yakin hapus?')) return;
+    const ok = await confirm({
+      title:        'Hapus Data Opname',
+      message:      'Apakah Anda yakin ingin menghapus data opname ini?',
+      confirmText:  'Hapus',
+      confirmColor: 'red',
+      icon:         Trash2,
+    });
+    if (!ok) return;
 
     try {
       setLoading(true);
       await stockopnameapi.delete(id);
-      setSuccess('✅ Data berhasil dihapus!');
-      
+      toast.success('Data berhasil dihapus!', 'Berhasil');
       fetchOpnames();
-      
-      setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
-      setError(err.response?.data?.message || 'Gagal hapus');
+      toast.error(err.response?.data?.message || 'Gagal hapus.', 'Error');
     } finally {
       setLoading(false);
     }
@@ -244,8 +225,6 @@ const StokOpnameAdmin = () => {
     });
     setSelectedProduct(null);
     setSearchProduct('');
-    setError('');
-    setSuccess('');
   };
 
   const handleExport = () => {
@@ -276,41 +255,28 @@ const StokOpnameAdmin = () => {
         for (let C = range.s.c; C <= range.e.c; ++C) {
           const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
           if (!ws[cellAddress]) continue;
-
           if (R === 0) {
             ws[cellAddress].s = {
-              font: { bold: true, color: { rgb: "FFFFFF" } },
-              fill: { fgColor: { rgb: "000000" } },
-              alignment: { horizontal: "center", vertical: "center" },
-              border: {
-                top: { style: "thin", color: { rgb: "000000" } },
-                bottom: { style: "thin", color: { rgb: "000000" } },
-                left: { style: "thin", color: { rgb: "000000" } },
-                right: { style: "thin", color: { rgb: "000000" } }
-              }
+              font: { bold: true, color: { rgb: 'FFFFFF' } },
+              fill: { fgColor: { rgb: '000000' } },
+              alignment: { horizontal: 'center', vertical: 'center' },
+              border: { top: { style: 'thin', color: { rgb: '000000' } }, bottom: { style: 'thin', color: { rgb: '000000' } }, left: { style: 'thin', color: { rgb: '000000' } }, right: { style: 'thin', color: { rgb: '000000' } } }
             };
           } else {
             ws[cellAddress].s = {
-              alignment: {
-                horizontal: C === 0 || C === 4 || C === 5 || C === 6 ? "center" : "left",
-                vertical: "center"
-              },
-              border: {
-                top: { style: "thin", color: { rgb: "CCCCCC" } },
-                bottom: { style: "thin", color: { rgb: "CCCCCC" } },
-                left: { style: "thin", color: { rgb: "CCCCCC" } },
-                right: { style: "thin", color: { rgb: "CCCCCC" } }
-              },
-              fill: { fgColor: { rgb: R % 2 === 0 ? "F9FAFB" : "FFFFFF" } }
+              alignment: { horizontal: C === 0 || C === 4 || C === 5 || C === 6 ? 'center' : 'left', vertical: 'center' },
+              border: { top: { style: 'thin', color: { rgb: 'CCCCCC' } }, bottom: { style: 'thin', color: { rgb: 'CCCCCC' } }, left: { style: 'thin', color: { rgb: 'CCCCCC' } }, right: { style: 'thin', color: { rgb: 'CCCCCC' } } },
+              fill: { fgColor: { rgb: R % 2 === 0 ? 'F9FAFB' : 'FFFFFF' } }
             };
           }
         }
       }
 
-      XLSX.utils.book_append_sheet(wb, ws, "Stok Opname");
-      XLSX.writeFile(wb, `Stok_Opname_${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.xlsx`);
-    } catch (err) {
-      console.error('Error exporting:', err);
+      XLSX.utils.book_append_sheet(wb, ws, 'Stok Opname');
+      XLSX.writeFile(wb, `Stok_Opname_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.xlsx`);
+      toast.success('Data berhasil di-export!', 'Export Berhasil');
+    } catch {
+      toast.error('Gagal export data.', 'Export Gagal');
     }
   };
 
@@ -332,6 +298,11 @@ const StokOpnameAdmin = () => {
 
   return (
     <div className="space-y-6">
+      <GlobalStyles />
+      <ToastContainer toasts={toast.toasts} onRemove={toast.remove} />
+      {confirmProps && <ConfirmModal {...confirmProps} />}
+
+      {/* Form */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -342,13 +313,6 @@ const StokOpnameAdmin = () => {
             <p className="text-gray-600 mt-1">Form pengecekan stok fisik gudang</p>
           </div>
         </div>
-
-        {success && (
-          <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg text-green-700">{success}</div>
-        )}
-        {error && (
-          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">{error}</div>
-        )}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
           {/* Tanggal */}
@@ -484,10 +448,13 @@ const StokOpnameAdmin = () => {
                   <p className="text-gray-600">Stok di Sistem:</p>
                   <button
                     onClick={async () => {
-                      const fresh = await productapi.getById(selectedProduct.product_id);
-                      setSelectedProduct(fresh.data || fresh);
-                      setSuccess('Stok diperbarui!');
-                      setTimeout(() => setSuccess(''), 2000);
+                      try {
+                        const fresh = await productapi.getById(selectedProduct.product_id);
+                        setSelectedProduct(fresh.data || fresh);
+                        toast.info('Stok berhasil diperbarui!');
+                      } catch {
+                        toast.error('Gagal refresh stok.');
+                      }
                     }}
                     className="text-blue-500 hover:text-blue-700"
                     title="Refresh stok terbaru"
@@ -573,7 +540,7 @@ const StokOpnameAdmin = () => {
         </div>
       </div>
 
-      {/* Riwayat Stok Opname */}
+      {/* Riwayat */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200">
         <div className="px-6 py-4 border-b border-gray-200">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -600,7 +567,8 @@ const StokOpnameAdmin = () => {
               </div>
               <button
                 onClick={handleExport}
-                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
+                disabled={filteredOpnames.length === 0}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium disabled:bg-gray-300 disabled:cursor-not-allowed"
               >
                 <Download className="w-5 h-5" />
                 Export
@@ -663,22 +631,22 @@ const StokOpnameAdmin = () => {
                     <td className="py-4 px-6">
                       <div className="flex items-center justify-center gap-2">
                         {opname.status_penyesuaian === 'Belum Disesuaikan' && (
-                          <button
-                            onClick={() => handleAdjustStock(opname.opname_id)}
-                            className="p-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 transition-colors"
-                            title="Sesuaikan Stok"
-                          >
-                            <CheckCircle className="w-4 h-4" />
-                          </button>
-                        )}
-                        {opname.status_penyesuaian === 'Belum Disesuaikan' && (
-                          <button
-                            onClick={() => handleDelete(opname.opname_id)}
-                            className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors"
-                            title="Hapus"
-                          >
-                            <XCircle className="w-4 h-4" />
-                          </button>
+                          <>
+                            <button
+                              onClick={() => handleAdjustStock(opname.opname_id)}
+                              className="p-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 transition-colors"
+                              title="Sesuaikan Stok"
+                            >
+                              <CheckCircle className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(opname.opname_id)}
+                              className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors"
+                              title="Hapus"
+                            >
+                              <XCircle className="w-4 h-4" />
+                            </button>
+                          </>
                         )}
                         {opname.status_penyesuaian === 'Disesuaikan' && (
                           <span className="text-xs text-gray-400">Sudah disesuaikan</span>
@@ -702,4 +670,4 @@ const StokOpnameAdmin = () => {
   );
 };
 
-export default StokOpnameAdmin; 
+export default StokOpnameAdmin;

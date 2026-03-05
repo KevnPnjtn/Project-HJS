@@ -24,7 +24,6 @@ class VerifyEmailController extends Controller
         ]);
 
         try {
-            // 1. Validate signature FIRST (before database query)
             if (!$request->hasValidSignature()) {
                 Log::warning('✗ Invalid or expired signature', ['user_id' => $id]);
                 
@@ -35,7 +34,6 @@ class VerifyEmailController extends Controller
                 ], 400);
             }
 
-            // 2. Find user
             $user = User::where('user_id', $id)->first();
 
             if (!$user) {
@@ -47,7 +45,6 @@ class VerifyEmailController extends Controller
                 ], 404);
             }
 
-            // 3. Check if already verified (sebelum validasi hash)
             if ($user->hasVerifiedEmail()) {
                 Log::info('ℹ Email already verified', [
                     'user_id' => $id,
@@ -67,7 +64,6 @@ class VerifyEmailController extends Controller
                 ], 200);
             }
 
-            // 4. Validate hash
             $expectedHash = sha1($user->getEmailForVerification());
             
             if (!hash_equals($expectedHash, (string) $hash)) {
@@ -83,7 +79,6 @@ class VerifyEmailController extends Controller
                 ], 400);
             }
 
-            // 5. Prevent race condition dengan cache lock
             $lockKey = "email_verification_lock_{$user->user_id}";
             
             if (Cache::has($lockKey)) {
@@ -95,11 +90,9 @@ class VerifyEmailController extends Controller
                 ], 429);
             }
 
-            // Set lock for 10 seconds
             Cache::put($lockKey, true, 10);
 
             try {
-                // 6. Mark email as verified
                 if ($user->markEmailAsVerified()) {
                     event(new Verified($user));
                     
@@ -121,14 +114,12 @@ class VerifyEmailController extends Controller
                     ], 200);
                 }
 
-                // Jika markEmailAsVerified() return false
                 return response()->json([
                     'status' => 'error',
                     'message' => 'Gagal memverifikasi email.',
                 ], 500);
 
             } finally {
-                // Always release lock
                 Cache::forget($lockKey);
             }
 
@@ -178,7 +169,6 @@ class VerifyEmailController extends Controller
                 ], 400);
             }
 
-            // ✅ Rate limiting untuk prevent spam
             $cacheKey = "resend_verification_{$user->user_id}";
             
             if (Cache::has($cacheKey)) {
@@ -191,7 +181,6 @@ class VerifyEmailController extends Controller
                 ], 429);
             }
 
-            // Set lock untuk 1 menit
             Cache::put($cacheKey, true, 60);
 
             try {

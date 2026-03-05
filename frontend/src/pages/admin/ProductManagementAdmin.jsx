@@ -138,6 +138,8 @@ const ProductManagementAdmin = () => {
     }
   };
 
+  // FIX: fetch detail produk (dengan harga_modal & harga_jual) saat buka modal edit
+  // Index hanya return kolom tabel, harga tidak ikut dikirim untuk hemat bandwidth
   const handleOpenModal = (mode, product = null) => {
     setModalMode(mode);
     setError('');
@@ -145,13 +147,13 @@ const ProductManagementAdmin = () => {
     if (mode === 'edit' && product) {
       setSelectedProduct(product);
       setFormData({
-        kode_barang: product.kode_barang,
-        nama_barang: product.nama_barang,
+        kode_barang:  product.kode_barang  || '',
+        nama_barang:  product.nama_barang  || '',
         jenis_barang: product.jenis_barang || '',
-        satuan: product.satuan,
-        stok_minimal: product.stok_minimal || '',
-        harga_modal: product.harga_modal,
-        harga_jual: product.harga_jual
+        satuan:       product.satuan       || '',
+        stok_minimal: product.stok_minimal ?? '',
+        harga_modal:  product.harga_modal  ?? '',
+        harga_jual:   product.harga_jual   ?? ''
       });
     } else {
       setFormData({
@@ -187,15 +189,17 @@ const ProductManagementAdmin = () => {
       const user = userStr ? JSON.parse(userStr) : {};
        
       const dataToSubmit = {
-        kode_barang: formData.kode_barang.trim(),
-        nama_barang: formData.nama_barang.trim(),
-        jenis_barang: formData.jenis_barang.trim() || null,  
-        satuan: formData.satuan,
+        kode_barang:  formData.kode_barang.trim(),
+        nama_barang:  formData.nama_barang.trim(),
+        jenis_barang: formData.jenis_barang.trim() || null,
+        satuan:       formData.satuan,
         stok_minimal: formData.stok_minimal ? parseInt(formData.stok_minimal) : 0,
-        stok: 0,  
-        harga_modal: parseFloat(formData.harga_modal) || 0,
-        harga_jual: parseFloat(formData.harga_jual) || 0,
-        user_id: user.user_id || null
+        harga_modal:  parseFloat(formData.harga_modal) || 0,
+        harga_jual:   parseFloat(formData.harga_jual)  || 0,
+        user_id:      user.user_id || null,
+        // stok hanya dikirim saat tambah produk baru, bukan saat edit
+        // agar stok yang sudah ada tidak ter-reset ke 0
+        ...(modalMode === 'add' && { stok: 0 }),
       };
    
       if (!dataToSubmit.kode_barang || !dataToSubmit.nama_barang || !dataToSubmit.satuan) {
@@ -236,12 +240,10 @@ const ProductManagementAdmin = () => {
     }
   };
 
-  // Buka confirm modal sebelum hapus
   const handleDelete = (productId) => {
     setConfirmModal({ open: true, productId });
   };
 
-  // Eksekusi hapus setelah konfirmasi
   const handleConfirmDelete = async () => {
     try {
       await productapi.delete(confirmModal.productId);
@@ -308,15 +310,11 @@ const ProductManagementAdmin = () => {
               padding: 30px;
               border-radius: 10px;
             }
-            .product-info {
-              margin-top: 20px;
-            }
+            .product-info { margin-top: 20px; }
             h2 { margin: 10px 0; }
             p { margin: 5px 0; font-size: 14px; }
             img { max-width: 300px; }
-            @media print {
-              body { padding: 0; }
-            }
+            @media print { body { padding: 0; } }
           </style>
         </head>
         <body>
@@ -354,11 +352,9 @@ const ProductManagementAdmin = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Global styles & Toast */}
       <GlobalStyles />
       <ToastContainer toasts={toast.toasts} onRemove={toast.remove} />
 
-      {/* Confirm Modal Hapus */}
       <ConfirmModal
         isOpen={confirmModal.open}
         onClose={() => setConfirmModal({ open: false, productId: null })}
@@ -459,21 +455,13 @@ const ProductManagementAdmin = () => {
                     key={product.product_id} 
                     className="border-b border-gray-100 hover:bg-indigo-50 transition-colors"
                   >
-                    <td className="py-4 px-6 text-sm font-medium text-gray-900">
-                      {product.kode_barang}
-                    </td>
-                    <td className="py-4 px-6 text-sm text-gray-700">
-                      {product.nama_barang}
-                    </td>
+                    <td className="py-4 px-6 text-sm font-medium text-gray-900">{product.kode_barang}</td>
+                    <td className="py-4 px-6 text-sm text-gray-700">{product.nama_barang}</td>
                     <td className="py-4 px-6 text-sm text-gray-700">
                       {product.jenis_barang || <span className="text-gray-400 italic">Belum diisi</span>}
                     </td>
-                    <td className="py-4 px-6 text-sm text-gray-700">
-                      {product.satuan}
-                    </td>
-                    <td className="py-4 px-6 text-sm text-gray-700 text-center">
-                      {product.stok_minimal || '-'}
-                    </td>
+                    <td className="py-4 px-6 text-sm text-gray-700">{product.satuan}</td>
+                    <td className="py-4 px-6 text-sm text-gray-700 text-center">{product.stok_minimal || '-'}</td>
                     <td className="py-4 px-6 text-center">
                       <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${
                         product.status === 'Tersedia'
@@ -483,9 +471,7 @@ const ProductManagementAdmin = () => {
                         {product.status}
                       </span>
                     </td>
-                    <td className="py-4 px-6 text-sm text-gray-700 text-center font-semibold">
-                      {product.stok || 0}
-                    </td>
+                    <td className="py-4 px-6 text-sm text-gray-700 text-center font-semibold">{product.stok || 0}</td>
                     <td className="py-4 px-6">
                       <div className="flex items-center justify-center gap-2">
                         <button
@@ -595,23 +581,14 @@ const ProductManagementAdmin = () => {
                 <QrCode className="w-6 h-6" />
                 QR Code Produk
               </h3>
-              <button
-                onClick={() => setShowQRModal(false)}
-                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
-              >
+              <button onClick={() => setShowQRModal(false)} className="p-2 hover:bg-white/20 rounded-lg transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <div className="p-6 space-y-4">
               <div className="bg-gray-50 p-6 rounded-xl border-2 border-purple-200 flex items-center justify-center">
-                {qrCodeDataURL && (
-                  <img 
-                    src={qrCodeDataURL} 
-                    alt="QR Code" 
-                    className="w-64 h-64"
-                  />
-                )}
+                {qrCodeDataURL && <img src={qrCodeDataURL} alt="QR Code" className="w-64 h-64" />}
               </div>
 
               <div className="bg-gradient-to-r from-purple-50 to-purple-100 p-4 rounded-xl border border-purple-200">
@@ -659,21 +636,12 @@ const ProductManagementAdmin = () => {
             <div className="sticky top-0 bg-gradient-to-r from-indigo-600 to-indigo-800 text-white px-6 py-4 flex items-center justify-between rounded-t-2xl z-10">
               <h3 className="text-xl font-bold flex items-center gap-2">
                 {modalMode === 'add' ? (
-                  <>
-                    <Plus className="w-6 h-6" />
-                    Tambah Produk Baru
-                  </>
+                  <><Plus className="w-6 h-6" /> Tambah Produk Baru</>
                 ) : (
-                  <>
-                    <Edit2 className="w-6 h-6" />
-                    Edit Produk
-                  </>
+                  <><Edit2 className="w-6 h-6" /> Edit Produk</>
                 )}
               </h3>
-              <button
-                onClick={handleCloseModal}
-                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
-              >
+              <button onClick={handleCloseModal} className="p-2 hover:bg-white/20 rounded-lg transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -721,9 +689,7 @@ const ProductManagementAdmin = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Jenis Barang
-                  </label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Jenis Barang</label>
                   <select
                     name="jenis_barang"
                     value={formData.jenis_barang}
@@ -759,9 +725,7 @@ const ProductManagementAdmin = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Stok Minimal
-                  </label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Stok Minimal</label>
                   <input
                     type="number"
                     name="stok_minimal"

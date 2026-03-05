@@ -14,11 +14,21 @@ use SimpleSoftwareIO\QrCode\Facades\QrCode;
 class ProductController extends Controller
 {
     public function index(Request $request)
-    {   
-        DB::enableQueryLog(); 
-        $startTime = microtime(true);
-
-        $query = Product::with('user');
+    {
+        // FIX 1: Hapus with('user') — tidak dibutuhkan di tabel produk
+        // FIX 2: Pilih hanya kolom yang dibutuhkan tabel, exclude qr_code (bisa besar)
+        $query = Product::select([
+            'product_id',
+            'kode_barang',
+            'nama_barang',
+            'jenis_barang',
+            'satuan',
+            'stok',
+            'stok_minimal',
+            'status',
+            'harga_modal',
+            'harga_jual',
+        ]);
 
         if ($request->has('status')) {
             if ($request->status === 'Tersedia') {
@@ -40,7 +50,7 @@ class ProductController extends Controller
                   ->orWhere('jenis_barang', 'like', "%{$search}%");
             });
         }
-        
+
         if ($request->has('for_dropdown') && $request->for_dropdown == true) {
             $products = $query->orderBy('nama_barang', 'asc')->get();
             return response()->json([
@@ -50,33 +60,35 @@ class ProductController extends Controller
         }
 
         $products = $query->latest()->paginate($request->per_page ?? 5);
-        $endTime = microtime(true);
-        $executionTime = ($endTime - $startTime) * 1000; 
-        
-        $queries = DB::getQueryLog();
-        
-        Log::info('ProductController@index Debug:', [
-            'execution_time_ms' => round($executionTime, 2),
-            'total_queries' => count($queries),
-            'queries' => $queries
+
+        // FIX 3: Hapus debug queries dari response — jangan expose SQL ke client
+        // Log tetap jalan di server tapi tidak dikirim ke frontend
+        Log::info('ProductController@index', [
+            'per_page' => $request->per_page ?? 5,
+            'page'     => $request->page ?? 1,
+            'total'    => $products->total(),
         ]);
 
         return response()->json([
             'success' => true,
-            'data' => $products,
-            'debug' => [ 
-                'execution_time_ms' => round($executionTime, 2),
-                'total_queries' => count($queries),
-                'queries' => $queries
-            ]
+            'data'    => $products,
         ]);
     }
 
     public function getForDropdown(Request $request)
     {
         try {
-            $query = Product::select('product_id', 'kode_barang', 'nama_barang', 'jenis_barang', 'satuan', 'stok', 'harga_modal', 'harga_jual');
-            
+            $query = Product::select([
+                'product_id',
+                'kode_barang',
+                'nama_barang',
+                'jenis_barang',
+                'satuan',
+                'stok',
+                'harga_modal',
+                'harga_jual',
+            ]);
+
             if ($request->has('only_available') && $request->only_available == true) {
                 $query->where('stok', '>', 0);
             }
@@ -90,16 +102,10 @@ class ProductController extends Controller
             }
 
             $products = $query->orderBy('nama_barang', 'asc')->get();
-            
-            Log::info('ProductController@getForDropdown:', [
-                'total_products' => $products->count(),
-                'only_available' => $request->only_available,
-                'products' => $products->toArray()
-            ]);
 
             return response()->json([
                 'success' => true,
-                'data' => $products
+                'data'    => $products
             ]);
 
         } catch (\Exception $e) {
@@ -107,16 +113,17 @@ class ProductController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to get products',
-                'error' => $e->getMessage()
+                'error'   => $e->getMessage()
             ], 500);
         }
     }
 
     public function show($id)
     {
+        // show() boleh load relasi & semua field karena hanya dipanggil saat edit
         $product = Product::with(['user', 'qrLogs', 'stockTransactions'])
             ->find($id);
-    
+
         if (!$product) {
             return response()->json([
                 'success' => false,
@@ -126,41 +133,41 @@ class ProductController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $product
+            'data'    => $product
         ]);
     }
 
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'kode_barang' => 'required|string|max:50|unique:products,kode_barang',
-    'nama_barang' => 'required|string|max:255',
-    'jenis_barang' => 'nullable|string|max:255',
-    'satuan' => 'required|string|max:50',
-    'stok_minimal' => 'nullable|integer|min:0',
-    'stok' => 'nullable|integer|min:0',
-    'harga_modal' => 'required|numeric|min:0',
-    'harga_jual' => 'required|numeric|min:0',
-    'user_id' => 'nullable|exists:users,user_id',
-    ], [
-    'kode_barang.required' => 'Kode barang wajib diisi',
-    'kode_barang.unique' => 'Kode barang sudah digunakan',
-    'nama_barang.required' => 'Nama barang wajib diisi',
-    'satuan.required' => 'Satuan wajib dipilih',
-    'harga_modal.required' => 'Harga modal wajib diisi',
-    'harga_jual.required' => 'Harga jual wajib diisi',
-    ]);
+            'kode_barang'  => 'required|string|max:50|unique:products,kode_barang',
+            'nama_barang'  => 'required|string|max:255',
+            'jenis_barang' => 'nullable|string|max:255',
+            'satuan'       => 'required|string|max:50',
+            'stok_minimal' => 'nullable|integer|min:0',
+            'stok'         => 'nullable|integer|min:0',
+            'harga_modal'  => 'required|numeric|min:0',
+            'harga_jual'   => 'required|numeric|min:0',
+            'user_id'      => 'nullable|exists:users,user_id',
+        ], [
+            'kode_barang.required' => 'Kode barang wajib diisi',
+            'kode_barang.unique'   => 'Kode barang sudah digunakan',
+            'nama_barang.required' => 'Nama barang wajib diisi',
+            'satuan.required'      => 'Satuan wajib dipilih',
+            'harga_modal.required' => 'Harga modal wajib diisi',
+            'harga_jual.required'  => 'Harga jual wajib diisi',
+        ]);
 
         if ($validator->fails()) {
             Log::error('Product validation failed:', [
-                'errors' => $validator->errors()->toArray(),
-                'request_data' => $request->all()
+                'errors'       => $validator->errors()->toArray(),
+                'request_data' => $request->except(['harga_modal', 'harga_jual']),
             ]);
 
             return response()->json([
                 'success' => false,
                 'message' => 'Validasi gagal',
-                'errors' => $validator->errors()
+                'errors'  => $validator->errors()
             ], 422);
         }
 
@@ -180,20 +187,25 @@ class ProductController extends Controller
             DB::commit();
             Cache::forget("product_{$product->product_id}");
 
+            // Return hanya field yang dibutuhkan, exclude qr_code dari response
             return response()->json([
                 'success' => true,
                 'message' => 'Product created successfully',
-                'data' => $product->fresh()
+                'data'    => $product->fresh([
+                    'product_id', 'kode_barang', 'nama_barang',
+                    'jenis_barang', 'satuan', 'stok', 'stok_minimal', 'status',
+                    'harga_modal', 'harga_jual',
+                ])
             ], 201);
 
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Product creation failed: ' . $e->getMessage());
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to create product',
-                'error' => $e->getMessage()
+                'error'   => $e->getMessage()
             ], 500);
         }
     }
@@ -210,21 +222,21 @@ class ProductController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'kode_barang' => 'sometimes|string|max:50|unique:products,kode_barang,' . $id . ',product_id',
-            'nama_barang' => 'sometimes|string|max:255',
+            'kode_barang'  => 'sometimes|string|max:50|unique:products,kode_barang,' . $id . ',product_id',
+            'nama_barang'  => 'sometimes|string|max:255',
             'jenis_barang' => 'nullable|string|max:255',
-            'satuan' => 'sometimes|string|max:50',
+            'satuan'       => 'sometimes|string|max:50',
             'stok_minimal' => 'nullable|integer|min:0',
-            'stok' => 'nullable|integer|min:0',
-            'harga_modal' => 'sometimes|numeric|min:0',
-            'harga_jual' => 'sometimes|numeric|min:0',
-            'user_id' => 'nullable|exists:users,user_id',
+            'stok'         => 'nullable|integer|min:0',
+            'harga_modal'  => 'sometimes|numeric|min:0',
+            'harga_jual'   => 'sometimes|numeric|min:0',
+            'user_id'      => 'nullable|exists:users,user_id',
         ]);
 
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
-                'errors' => $validator->errors()
+                'errors'  => $validator->errors()
             ], 422);
         }
 
@@ -234,7 +246,7 @@ class ProductController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Product updated successfully',
-            'data' => $product
+            'data'    => $product
         ]);
     }
 
@@ -257,7 +269,7 @@ class ProductController extends Controller
             'message' => 'Product deleted successfully'
         ]);
     }
- 
+
     public function scanQrCode(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -268,11 +280,11 @@ class ProductController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'QR Code wajib diisi',
-                'errors' => $validator->errors()
+                'errors'  => $validator->errors()
             ], 422);
         }
 
-        try { 
+        try {
             $product = Product::where('kode_barang', $request->qr_code)
                 ->orWhere('uuid', $request->qr_code)
                 ->orWhere('qr_code', $request->qr_code)
@@ -284,15 +296,13 @@ class ProductController extends Controller
                     'message' => 'Produk tidak ditemukan'
                 ], 404);
             }
- 
+
             if (class_exists('App\Models\ProductQrLog')) {
                 try {
                     $scannedBy = 'Guest';
-                     
                     if (Auth::check()) {
                         $scannedBy = Auth::user()->name;
                     }
-                    
                     \App\Models\ProductQrLog::create([
                         'product_id' => $product->product_id,
                         'scanned_by' => $scannedBy,
@@ -306,19 +316,19 @@ class ProductController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Produk ditemukan',
-                'data' => $product
+                'data'    => $product
             ], 200);
-            
+
         } catch (\Exception $e) {
             Log::error('Scan QR Error: ' . $e->getMessage(), [
                 'qr_code' => $request->qr_code,
-                'trace' => $e->getTraceAsString()
+                'trace'   => $e->getTraceAsString()
             ]);
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Terjadi kesalahan saat memindai QR code',
-                'error' => config('app.debug') ? $e->getMessage() : null
+                'error'   => config('app.debug') ? $e->getMessage() : null
             ], 500);
         }
     }

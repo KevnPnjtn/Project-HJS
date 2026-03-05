@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Save, RotateCcw, Edit2, Trash2, Download, PackageMinus, QrCode, X, ChevronDown, CheckCircle2, AlertCircle, AlertTriangle } from 'lucide-react';
+import { Search, Save, RotateCcw, Edit2, Trash2, Download, PackageMinus, QrCode, X, ChevronDown, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { GlobalStyles, ToastContainer, ConfirmModal } from '../../components/ui/SharedComponents';
+import { useToast, useConfirm } from '../../components/ui/sharedHooks';
 import { productapi } from '../../services/productapi';
 import { stockapi } from '../../services/stockapi';
 import * as XLSX from 'xlsx';
@@ -11,7 +13,7 @@ const BarangKeluarAdmin = () => {
     jumlah_keluar: '',
     penanggung_jawab: ''
   });
-  
+
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [transactions, setTransactions] = useState([]);
   const [products, setProducts] = useState([]);
@@ -22,16 +24,17 @@ const BarangKeluarAdmin = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
   const dropdownRef = useRef(null);
-  
+
   const [showEditModal, setShowEditModal] = useState(false);
   const [editData, setEditData] = useState(null);
-  
+
   const [selectedIds, setSelectedIds] = useState([]);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
-  
+
+  const toast = useToast();
+  const { confirm, confirmProps } = useConfirm();
+
   const [pagination, setPagination] = useState({
     currentPage: 1,
     totalPages: 1,
@@ -44,82 +47,76 @@ const BarangKeluarAdmin = () => {
   }, [pagination.currentPage]);
 
   const fetchInitialData = async () => {
-      try {
-        if (transactions.length === 0) {
-          setInitialLoading(true);
-        }
-        
-        setError('');
-        
-        const productsResponse = await productapi.getForDropdown();
-        
-        let allProducts = [];
-        if (productsResponse?.data?.data && Array.isArray(productsResponse.data.data)) {
-          allProducts = productsResponse.data.data;
-        } else if (productsResponse?.data && Array.isArray(productsResponse.data)) {
-          allProducts = productsResponse.data;
-        }
-  
-        const sortedProducts = [...allProducts].sort((a, b) => b.product_id - a.product_id);
-        
-        setProducts(sortedProducts);
-        setFilteredProducts(sortedProducts);
-  
-        const transactionsResponse = await stockapi.getAll({ 
-          jenis_transaksi: 'OUT',
-          page: pagination.currentPage,
-          per_page: pagination.perPage
-        });
-  
-        const responseData = transactionsResponse.data;
-        const transactionsData = responseData?.data || [];
-        const paginationInfo = {
-        total: responseData.total || responseData.pagination?.total,
-        total_pages: responseData.last_page || responseData.pagination?.total_pages,
-        current_page: responseData.current_page || responseData.pagination?.current_page,
-        per_page: responseData.per_page || responseData.pagination?.per_page
-      }; 
-        
-        const enrichedTransactions = transactionsData.map(transaction => {
-          const fullProduct = allProducts.find(p => p.product_id === transaction.product_id);
-          if (fullProduct) {
-            return {
-              ...transaction,
-              product: {
-                ...transaction.product,
-                kode_barang: fullProduct.kode_barang || transaction.product?.kode_barang,
-                nama_barang: fullProduct.nama_barang || transaction.product?.nama_barang,
-                jenis_barang: fullProduct.jenis_barang || transaction.product?.jenis_barang || '-',
-                satuan: fullProduct.satuan || transaction.product?.satuan || '-',
-                stok: fullProduct.stok || transaction.product?.stok || 0
-              }
-            };
-          }
-          return transaction;
-        });
-        
-        setTransactions(enrichedTransactions);
-        setFilteredTransactions(enrichedTransactions);
-  
-        setPagination(prev => ({
-          ...prev,
-          totalPages: paginationInfo.total_pages || Math.ceil((paginationInfo.total || enrichedTransactions.length) / prev.perPage),
-          totalItems: paginationInfo.total || enrichedTransactions.length
-        }));
-  
-      } catch (err) {
-        setError(err.response?.data?.message || 'Gagal memuat data. Silakan refresh halaman.');
-      } finally {
-        setInitialLoading(false);
+    try {
+      if (transactions.length === 0) setInitialLoading(true);
+
+      const productsResponse = await productapi.getForDropdown();
+
+      let allProducts = [];
+      if (productsResponse?.data?.data && Array.isArray(productsResponse.data.data)) {
+        allProducts = productsResponse.data.data;
+      } else if (productsResponse?.data && Array.isArray(productsResponse.data)) {
+        allProducts = productsResponse.data;
       }
-    };
+
+      const sortedProducts = [...allProducts].sort((a, b) => b.product_id - a.product_id);
+      setProducts(sortedProducts);
+      setFilteredProducts(sortedProducts);
+
+      const transactionsResponse = await stockapi.getAll({
+        jenis_transaksi: 'OUT',
+        page: pagination.currentPage,
+        per_page: pagination.perPage
+      });
+
+      const responseData = transactionsResponse.data;
+      const transactionsData = responseData?.data || [];
+      const paginationInfo = {
+        total:        responseData.total        || responseData.pagination?.total,
+        total_pages:  responseData.last_page    || responseData.pagination?.total_pages,
+        current_page: responseData.current_page || responseData.pagination?.current_page,
+        per_page:     responseData.per_page     || responseData.pagination?.per_page
+      };
+
+      const enrichedTransactions = transactionsData.map(transaction => {
+        const fullProduct = allProducts.find(p => p.product_id === transaction.product_id);
+        if (fullProduct) {
+          return {
+            ...transaction,
+            product: {
+              ...transaction.product,
+              kode_barang:  fullProduct.kode_barang  || transaction.product?.kode_barang,
+              nama_barang:  fullProduct.nama_barang  || transaction.product?.nama_barang,
+              jenis_barang: fullProduct.jenis_barang || transaction.product?.jenis_barang || '-',
+              satuan:       fullProduct.satuan       || transaction.product?.satuan       || '-',
+              stok:         fullProduct.stok         || transaction.product?.stok         || 0
+            }
+          };
+        }
+        return transaction;
+      });
+
+      setTransactions(enrichedTransactions);
+      setFilteredTransactions(enrichedTransactions);
+
+      setPagination(prev => ({
+        ...prev,
+        totalPages: paginationInfo.total_pages || Math.ceil((paginationInfo.total || enrichedTransactions.length) / prev.perPage),
+        totalItems: paginationInfo.total || enrichedTransactions.length
+      }));
+
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Gagal memuat data. Silakan refresh halaman.', 'Error');
+    } finally {
+      setInitialLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!searchProduct.trim()) {
       setFilteredProducts(products);
       return;
     }
-
     const filtered = products.filter(p =>
       p.nama_barang?.toLowerCase().includes(searchProduct.toLowerCase()) ||
       p.kode_barang?.toLowerCase().includes(searchProduct.toLowerCase()) ||
@@ -129,19 +126,25 @@ const BarangKeluarAdmin = () => {
   }, [searchProduct, products]);
 
   useEffect(() => {
-    setFilteredTransactions(transactions);
+    if (!searchTerm.trim()) {
+      setFilteredTransactions(transactions);
+      return;
+    }
+    const filtered = transactions.filter(t =>
+      t.product?.kode_barang?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      t.product?.nama_barang?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      t.product?.jenis_barang?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    setFilteredTransactions(filtered);
   }, [searchTerm, transactions]);
-  
+
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setShowDropdown(false);
-        if (!selectedProduct) {
-          setSearchProduct('');
-        }
+        if (!selectedProduct) setSearchProduct('');
       }
     };
-
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [selectedProduct]);
@@ -160,38 +163,33 @@ const BarangKeluarAdmin = () => {
   };
 
   const handleSimpan = async () => {
-    setError('');
-    setSuccess('');
-
-    if (!formData.tanggal_keluar) return setError('Tanggal keluar harus diisi!');
-    if (!selectedProduct) return setError('Silakan pilih produk terlebih dahulu!');
-    if (!formData.jumlah_keluar || formData.jumlah_keluar <= 0) return setError('Jumlah keluar harus lebih dari 0!');
-    if (parseInt(formData.jumlah_keluar) > selectedProduct.stok) return setError(`Stok tidak mencukupi! Stok tersedia: ${selectedProduct.stok}`);
-    if (!formData.penanggung_jawab.trim()) return setError('Penanggung jawab harus diisi!');
+    if (!formData.tanggal_keluar) return toast.error('Tanggal keluar harus diisi!');
+    if (!selectedProduct) return toast.error('Silakan pilih produk terlebih dahulu!');
+    if (!formData.jumlah_keluar || formData.jumlah_keluar <= 0) return toast.error('Jumlah keluar harus lebih dari 0!');
+    if (parseInt(formData.jumlah_keluar) > selectedProduct.stok) return toast.error(`Stok tidak mencukupi! Stok tersedia: ${selectedProduct.stok}`);
+    if (!formData.penanggung_jawab.trim()) return toast.error('Penanggung jawab harus diisi!');
 
     try {
       setLoading(true);
       const dataToSubmit = {
-        product_id: parseInt(selectedProduct.product_id),
-        jenis_transaksi: 'OUT',
-        jumlah: parseInt(formData.jumlah_keluar),
-        catatan: `Barang keluar - ${selectedProduct.nama_barang}`,
+        product_id:       parseInt(selectedProduct.product_id),
+        jenis_transaksi:  'OUT',
+        jumlah:           parseInt(formData.jumlah_keluar),
+        catatan:          `Barang keluar - ${selectedProduct.nama_barang}`,
         penanggung_jawab: formData.penanggung_jawab
       };
 
       await stockapi.create(dataToSubmit);
+      toast.success('Transaksi barang keluar berhasil disimpan!', 'Berhasil');
 
-              
-      setSuccess('✓ Transaksi barang keluar berhasil disimpan!');
-              
       setTimeout(() => {
-      handleReset();
-      setPagination(prev => ({ ...prev, currentPage: 1 }));
-      fetchInitialData();
-    }, 1500);
+        handleReset();
+        setPagination(prev => ({ ...prev, currentPage: 1 }));
+        fetchInitialData();
+      }, 1500);
 
     } catch (err) {
-      setError(err.response?.data?.message || 'Gagal menyimpan transaksi');
+      toast.error(err.response?.data?.message || 'Gagal menyimpan transaksi.', 'Error');
     } finally {
       setLoading(false);
     }
@@ -206,17 +204,15 @@ const BarangKeluarAdmin = () => {
     });
     setSelectedProduct(null);
     setSearchProduct('');
-    setError('');
-    setSuccess('');
   };
 
   const handleEdit = (transaction) => {
     setEditData({
-      transaction_id: transaction.transaction_id,
-      jumlah: transaction.jumlah,
+      transaction_id:   transaction.transaction_id,
+      jumlah:           transaction.jumlah,
       penanggung_jawab: transaction.penanggung_jawab || '',
-      catatan: transaction.catatan || '',
-      product_name: transaction.product?.nama_barang || ''
+      catatan:          transaction.catatan || '',
+      product_name:     transaction.product?.nama_barang || ''
     });
     setShowEditModal(true);
   };
@@ -226,32 +222,37 @@ const BarangKeluarAdmin = () => {
     try {
       setLoading(true);
       await stockapi.update(editData.transaction_id, {
-        jumlah: parseInt(editData.jumlah),
+        jumlah:           parseInt(editData.jumlah),
         penanggung_jawab: editData.penanggung_jawab,
-        catatan: editData.catatan
+        catatan:          editData.catatan
       });
-      setSuccess('✓ Transaksi berhasil diupdate!');
+      toast.success('Transaksi berhasil diupdate!', 'Berhasil');
       setShowEditModal(false);
       setEditData(null);
       fetchInitialData();
-      setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
-      setError(err.response?.data?.message || 'Gagal update transaksi');
+      toast.error(err.response?.data?.message || 'Gagal update transaksi.', 'Error');
     } finally {
       setLoading(false);
     }
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Apakah Anda yakin ingin menghapus transaksi ini? Stok akan dikembalikan.')) {
-      try {
-        await stockapi.delete(id);
-        setSuccess('✓ Transaksi berhasil dihapus!');
-        fetchInitialData();
-        setTimeout(() => setSuccess(''), 3000);
-      } catch (err) {
-        setError(err.response?.data?.message || 'Gagal menghapus transaksi');
-      }
+    const ok = await confirm({
+      title:        'Hapus Transaksi',
+      message:      'Apakah Anda yakin ingin menghapus transaksi ini? Stok akan dikembalikan.',
+      confirmText:  'Hapus',
+      confirmColor: 'red',
+      icon:         Trash2,
+    });
+    if (!ok) return;
+
+    try {
+      await stockapi.delete(id);
+      toast.success('Transaksi berhasil dihapus!', 'Berhasil');
+      fetchInitialData();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Gagal menghapus transaksi.', 'Error');
     }
   };
 
@@ -270,7 +271,7 @@ const BarangKeluarAdmin = () => {
 
   const toggleSelectId = (id) => {
     if (selectedIds.includes(id)) {
-      setSelectedIds(selectedIds.filter(selectedId => selectedId !== id));
+      setSelectedIds(selectedIds.filter(sid => sid !== id));
     } else {
       setSelectedIds([...selectedIds, id]);
     }
@@ -278,25 +279,30 @@ const BarangKeluarAdmin = () => {
 
   const handleBulkDelete = async () => {
     if (selectedIds.length === 0) {
-      setError('Pilih minimal 1 transaksi untuk dihapus');
-      setTimeout(() => setError(''), 3000);
+      toast.warning('Pilih minimal 1 transaksi untuk dihapus.');
       return;
     }
 
-    if (window.confirm(`Apakah Anda yakin ingin menghapus ${selectedIds.length} transaksi yang dipilih? Stok akan dikembalikan.`)) {
-      try {
-        setLoading(true);
-        await Promise.all(selectedIds.map(id => stockapi.delete(id)));
-        setSuccess(`✓ Berhasil menghapus ${selectedIds.length} transaksi!`);
-        setSelectedIds([]);
-        setIsSelectionMode(false);
-        fetchInitialData();
-        setTimeout(() => setSuccess(''), 3000);
-      } catch {
-        setError('Gagal menghapus transaksi');
-      } finally {
-        setLoading(false);
-      }
+    const ok = await confirm({
+      title:        'Hapus Beberapa Transaksi',
+      message:      `Apakah Anda yakin ingin menghapus ${selectedIds.length} transaksi yang dipilih? Stok akan dikembalikan.`,
+      confirmText:  `Hapus (${selectedIds.length})`,
+      confirmColor: 'red',
+      icon:         Trash2,
+    });
+    if (!ok) return;
+
+    try {
+      setLoading(true);
+      await Promise.all(selectedIds.map(id => stockapi.delete(id)));
+      toast.success(`Berhasil menghapus ${selectedIds.length} transaksi!`, 'Berhasil');
+      setSelectedIds([]);
+      setIsSelectionMode(false);
+      fetchInitialData();
+    } catch {
+      toast.error('Gagal menghapus transaksi.', 'Error');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -327,56 +333,43 @@ const BarangKeluarAdmin = () => {
         for (let C = range.s.c; C <= range.e.c; ++C) {
           const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
           if (!ws[cellAddress]) continue;
-          
           if (R === 0) {
             ws[cellAddress].s = {
-              font: { bold: true, color: { rgb: "FFFFFF" } },
-              fill: { fgColor: { rgb: "000000" } },
-              alignment: { horizontal: "center", vertical: "center" },
-              border: {
-                top: { style: "thin", color: { rgb: "000000" } },
-                bottom: { style: "thin", color: { rgb: "000000" } },
-                left: { style: "thin", color: { rgb: "000000" } },
-                right: { style: "thin", color: { rgb: "000000" } }
-              }
+              font: { bold: true, color: { rgb: 'FFFFFF' } },
+              fill: { fgColor: { rgb: '000000' } },
+              alignment: { horizontal: 'center', vertical: 'center' },
+              border: { top: { style: 'thin', color: { rgb: '000000' } }, bottom: { style: 'thin', color: { rgb: '000000' } }, left: { style: 'thin', color: { rgb: '000000' } }, right: { style: 'thin', color: { rgb: '000000' } } }
             };
           } else {
             ws[cellAddress].s = {
-              alignment: { horizontal: C === 0 || C === 6 ? "center" : "left", vertical: "center" },
-              border: {
-                top: { style: "thin", color: { rgb: "CCCCCC" } },
-                bottom: { style: "thin", color: { rgb: "CCCCCC" } },
-                left: { style: "thin", color: { rgb: "CCCCCC" } },
-                right: { style: "thin", color: { rgb: "CCCCCC" } }
-              },
-              fill: { fgColor: { rgb: R % 2 === 0 ? "F9FAFB" : "FFFFFF" } }
+              alignment: { horizontal: C === 0 || C === 6 ? 'center' : 'left', vertical: 'center' },
+              border: { top: { style: 'thin', color: { rgb: 'CCCCCC' } }, bottom: { style: 'thin', color: { rgb: 'CCCCCC' } }, left: { style: 'thin', color: { rgb: 'CCCCCC' } }, right: { style: 'thin', color: { rgb: 'CCCCCC' } } },
+              fill: { fgColor: { rgb: R % 2 === 0 ? 'F9FAFB' : 'FFFFFF' } }
             };
           }
         }
       }
 
-      XLSX.utils.book_append_sheet(wb, ws, "Barang Keluar");
+      XLSX.utils.book_append_sheet(wb, ws, 'Barang Keluar');
       const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
       XLSX.writeFile(wb, `Barang_Keluar_${timestamp}.xlsx`);
-      
-      setSuccess('✓ Data berhasil di-export!');
-      setTimeout(() => setSuccess(''), 3000);
+      toast.success('Data berhasil di-export!', 'Export Berhasil');
     } catch {
-      setError('Gagal export data');
-      setTimeout(() => setError(''), 3000);
+      toast.error('Gagal export data.', 'Export Gagal');
     }
   };
 
   const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    return new Date(dateString).toLocaleDateString('id-ID', {
+      day: '2-digit', month: '2-digit', year: 'numeric'
+    });
   };
 
   if (initialLoading && transactions.length === 0) {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-red-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Memuat data barang keluar...</p>
         </div>
       </div>
@@ -385,6 +378,10 @@ const BarangKeluarAdmin = () => {
 
   return (
     <div className="space-y-6">
+      <GlobalStyles />
+      <ToastContainer toasts={toast.toasts} onRemove={toast.remove} />
+      {confirmProps && <ConfirmModal {...confirmProps} />}
+
       {/* Header */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div className="flex items-center justify-between mb-6">
@@ -397,23 +394,9 @@ const BarangKeluarAdmin = () => {
           </div>
         </div>
 
-        {/* Alert Messages */}
-        {success && (
-          <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg text-green-700 flex items-center gap-3 animate-pulse">
-            <CheckCircle2 className="w-5 h-5" />
-            {success}
-          </div>
-        )}
-        {error && (
-          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 flex items-center gap-3">
-            <AlertCircle className="w-5 h-5" />
-            {error}
-          </div>
-        )}
-
         {/* Form Row 1 */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-          {/* 1. Tanggal Keluar */}
+          {/* Tanggal Keluar */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
               Tanggal Keluar <span className="text-red-500">*</span>
@@ -426,13 +409,12 @@ const BarangKeluarAdmin = () => {
             />
           </div>
 
-          {/* 2. Pilih Barang - Fixed Height Box */}
+          {/* Pilih Barang */}
           <div className="relative" ref={dropdownRef}>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
               Pilih Barang <span className="text-red-500">*</span>
             </label>
-            
-            {/* Container dengan tinggi tetap */}
+
             <div className="h-[42px]">
               {!selectedProduct ? (
                 <div className="relative h-full">
@@ -448,9 +430,7 @@ const BarangKeluarAdmin = () => {
               ) : (
                 <div className="flex gap-2 h-full">
                   <div className="flex-1 px-4 py-2 border-2 border-red-400 bg-gradient-to-r from-red-50 to-red-100 rounded-lg shadow-sm flex items-center">
-                    <div className="overflow-hidden">
-                      <p className="font-semibold text-red-900 text-sm truncate">{selectedProduct.nama_barang}</p>
-                    </div>
+                    <p className="font-semibold text-red-900 text-sm truncate">{selectedProduct.nama_barang}</p>
                   </div>
                   <button
                     type="button"
@@ -463,10 +443,8 @@ const BarangKeluarAdmin = () => {
                 </div>
               )}
 
-              {/* Dropdown Content */}
               {showDropdown && !selectedProduct && (
-                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-xl overflow-hidden animate-in slide-in-from-top-2 duration-200">
-                  {/* Search Box */}
+                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-xl overflow-hidden">
                   <div className="p-3 border-b border-gray-200 bg-gradient-to-r from-red-50 to-red-100">
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-red-500" />
@@ -481,9 +459,7 @@ const BarangKeluarAdmin = () => {
                     </div>
                   </div>
 
-                  
-                  {/* List Item */}
-                  <div className="max-h-80 overflow-y-auto custom-scrollbar">
+                  <div className="max-h-80 overflow-y-auto">
                     {filteredProducts.length === 0 ? (
                       <div className="p-6 text-center text-gray-500">
                         <PackageMinus className="w-12 h-12 mx-auto mb-2 text-gray-300" />
@@ -521,7 +497,7 @@ const BarangKeluarAdmin = () => {
             </div>
           </div>
 
-          {/* 3. Jumlah Keluar */}
+          {/* Jumlah Keluar */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
               Jumlah Keluar <span className="text-red-500">*</span>
@@ -538,7 +514,7 @@ const BarangKeluarAdmin = () => {
           </div>
         </div>
 
-        {/* Form Row 2 - Penanggung Jawab */}
+        {/* Form Row 2 */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -554,7 +530,7 @@ const BarangKeluarAdmin = () => {
           </div>
         </div>
 
-        {/* Product Info Card - Only shown when product is selected */}
+        {/* Product Info Card */}
         {selectedProduct && (
           <div className="mb-4 p-5 bg-gradient-to-r from-red-50 to-red-100 border-2 border-red-300 rounded-xl shadow-md">
             <div className="flex items-start justify-between">
@@ -638,17 +614,17 @@ const BarangKeluarAdmin = () => {
                     className="pl-11 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 transition-all"
                   />
                 </div>
-                <button 
+                <button
                   onClick={toggleSelectionMode}
                   className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-all font-medium shadow-md hover:shadow-lg"
-                  title="Pilih beberapa untuk dihapus"
                 >
                   <CheckCircle2 className="w-5 h-5" />
                   Pilih
                 </button>
-                <button 
+                <button
                   onClick={handleExport}
-                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all font-medium shadow-md hover:shadow-lg"
+                  disabled={filteredTransactions.length === 0}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all font-medium shadow-md hover:shadow-lg disabled:bg-gray-300 disabled:cursor-not-allowed"
                 >
                   <Download className="w-5 h-5" />
                   Export
@@ -657,11 +633,9 @@ const BarangKeluarAdmin = () => {
             ) : (
               <>
                 <div className="flex items-center gap-2 px-4 py-2 bg-red-50 border border-red-300 rounded-lg">
-                  <span className="text-sm font-semibold text-red-700">
-                    {selectedIds.length} dipilih
-                  </span>
+                  <span className="text-sm font-semibold text-red-700">{selectedIds.length} dipilih</span>
                 </div>
-                <button 
+                <button
                   onClick={handleBulkDelete}
                   disabled={selectedIds.length === 0 || loading}
                   className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all font-medium shadow-md hover:shadow-lg disabled:bg-gray-300 disabled:cursor-not-allowed"
@@ -669,7 +643,7 @@ const BarangKeluarAdmin = () => {
                   <Trash2 className="w-5 h-5" />
                   Hapus ({selectedIds.length})
                 </button>
-                <button 
+                <button
                   onClick={toggleSelectionMode}
                   className="flex items-center gap-2 px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-all font-medium shadow-md hover:shadow-lg"
                 >
@@ -710,17 +684,17 @@ const BarangKeluarAdmin = () => {
             <tbody>
               {filteredTransactions.length === 0 ? (
                 <tr>
-                  <td colSpan={isSelectionMode ? "9" : "8"} className="text-center py-12 text-gray-500">
+                  <td colSpan={isSelectionMode ? 9 : 8} className="text-center py-12 text-gray-500">
                     <PackageMinus className="w-16 h-16 mx-auto mb-4 text-gray-300" />
                     <p className="text-lg font-medium">Belum ada transaksi barang keluar</p>
                   </td>
                 </tr>
               ) : (
                 filteredTransactions.map((transaction) => (
-                  <tr 
-                    key={transaction.transaction_id} 
+                  <tr
+                    key={transaction.transaction_id}
                     className={`border-b border-gray-100 transition-colors ${
-                      isSelectionMode 
+                      isSelectionMode
                         ? selectedIds.includes(transaction.transaction_id)
                           ? 'bg-red-100 hover:bg-red-200'
                           : 'hover:bg-red-50'
@@ -782,7 +756,6 @@ const BarangKeluarAdmin = () => {
                 Menampilkan {filteredTransactions.length} dari {pagination.totalItems} transaksi
                 {pagination.totalPages > 1 && ` (Halaman ${pagination.currentPage} dari ${pagination.totalPages})`}
               </p>
-              
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setPagination(prev => ({ ...prev, currentPage: prev.currentPage - 1 }))}
@@ -791,28 +764,21 @@ const BarangKeluarAdmin = () => {
                 >
                   ← Prev
                 </button>
-                
                 <div className="flex gap-1">
                   {Array.from({ length: Math.min(Math.max(pagination.totalPages, 1), 5) }, (_, i) => {
                     let pageNum;
                     const totalPages = Math.max(pagination.totalPages, 1);
-                    if (totalPages <= 5) {
-                      pageNum = i + 1;
-                    } else if (pagination.currentPage <= 3) {
-                      pageNum = i + 1;
-                    } else if (pagination.currentPage >= totalPages - 2) {
-                      pageNum = totalPages - 4 + i;
-                    } else {
-                      pageNum = pagination.currentPage - 2 + i;
-                    }
-                    
+                    if (totalPages <= 5) pageNum = i + 1;
+                    else if (pagination.currentPage <= 3) pageNum = i + 1;
+                    else if (pagination.currentPage >= totalPages - 2) pageNum = totalPages - 4 + i;
+                    else pageNum = pagination.currentPage - 2 + i;
                     return (
                       <button
                         key={pageNum}
                         onClick={() => setPagination(prev => ({ ...prev, currentPage: pageNum }))}
                         className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
                           pagination.currentPage === pageNum
-                            ? 'bg-blue-600 text-white shadow-md'
+                            ? 'bg-red-600 text-white shadow-md'
                             : 'border border-gray-300 hover:bg-gray-100'
                         }`}
                       >
@@ -821,7 +787,6 @@ const BarangKeluarAdmin = () => {
                     );
                   })}
                 </div>
-                
                 <button
                   onClick={() => setPagination(prev => ({ ...prev, currentPage: prev.currentPage + 1 }))}
                   disabled={pagination.currentPage === pagination.totalPages}
@@ -837,8 +802,8 @@ const BarangKeluarAdmin = () => {
 
       {/* Edit Modal */}
       {showEditModal && editData && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-in fade-in duration-200">
-          <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-2xl animate-in zoom-in duration-300">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-2xl">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
                 <Edit2 className="w-5 h-5 text-red-600" />
@@ -848,11 +813,11 @@ const BarangKeluarAdmin = () => {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            
+
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
               <p className="text-sm text-red-700 font-medium">{editData.product_name}</p>
             </div>
-            
+
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Jumlah</label>
@@ -883,7 +848,7 @@ const BarangKeluarAdmin = () => {
                 />
               </div>
             </div>
-            
+
             <div className="flex gap-3 mt-6">
               <button
                 onClick={handleUpdateTransaction}
