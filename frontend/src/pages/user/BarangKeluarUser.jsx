@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
-  PackageMinus, X, AlertCircle, CheckCircle,
-  Package, User, Hash
+  PackageMinus, X, CheckCircle, ChevronDown,
+  Package, User, Hash, Search
 } from 'lucide-react';
+import { GlobalStyles, ToastContainer } from '../../components/ui/SharedComponents';
+import { useToast } from '../../components/ui/sharedHooks';
 import { productapi } from '../../services/productapi';
 import { stockapi } from '../../services/stockapi';
 
@@ -18,33 +20,60 @@ const BarangKeluarUser = () => {
   const [loading, setLoading] = useState(false);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
-  const [showAlert, setShowAlert] = useState({ show: false, type: '', message: '' });
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [productSearch, setProductSearch] = useState('');
+  const dropdownRef = useRef(null);
+  const toast = useToast();
 
   useEffect(() => {
     fetchInitialData();
   }, []);
 
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const filteredProducts = products.filter(p => {
+    if (!productSearch.trim()) return true;
+    const q = productSearch.toLowerCase();
+    return (
+      p.nama_barang?.toLowerCase().includes(q) ||
+      p.kode_barang?.toLowerCase().includes(q)
+    );
+  });
+
   const fetchInitialData = async () => {
     try {
       setLoading(true);
       const response = await productapi.getForDropdown({ only_available: true });
-
       let allProducts = response.data?.data || [];
       allProducts = [...allProducts].sort((a, b) => b.product_id - a.product_id);
-
       setProducts(allProducts);
     } catch (error) {
       console.error('Error fetching products:', error);
-      showAlertMessage('error', 'Gagal memuat data produk');
+      toast.error('Gagal memuat data produk.', 'Error');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSelectProduct = (productId) => {
-    const product = products.find(p => p.product_id === parseInt(productId));
-    setSelectedProduct(product || null);
-    setFormData({ ...formData, product_id: productId });
+  const handleSelectProduct = (product) => {
+    setSelectedProduct(product);
+    setFormData({ ...formData, product_id: product.product_id });
+    setShowDropdown(false);
+    setProductSearch('');
+  };
+
+  const handleClearProduct = () => {
+    setSelectedProduct(null);
+    setFormData({ ...formData, product_id: '' });
+    setProductSearch('');
   };
 
   const handleInputChange = (e) => {
@@ -52,31 +81,23 @@ const BarangKeluarUser = () => {
     setFormData({ ...formData, [name]: value });
   };
 
-  const showAlertMessage = (type, message) => {
-    setShowAlert({ show: true, type, message });
-    setTimeout(() => setShowAlert({ show: false, type: '', message: '' }), 5000);
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!selectedProduct) {
-      showAlertMessage('error', 'Pilih produk terlebih dahulu');
+      toast.warning('Pilih produk terlebih dahulu.', 'Produk Belum Dipilih');
       return;
     }
-
     if (!formData.jumlah || formData.jumlah <= 0) {
-      showAlertMessage('error', 'Jumlah barang harus lebih dari 0');
+      toast.warning('Jumlah barang harus lebih dari 0.', 'Jumlah Tidak Valid');
       return;
     }
-
     if (parseInt(formData.jumlah) > selectedProduct.stok) {
-      showAlertMessage('error', `Stok tidak mencukupi. Stok tersedia: ${selectedProduct.stok}`);
+      toast.error(`Stok tidak mencukupi. Stok tersedia: ${selectedProduct.stok} ${selectedProduct.satuan}.`, 'Stok Kurang');
       return;
     }
-
     if (!formData.penanggung_jawab.trim()) {
-      showAlertMessage('error', 'Penanggung jawab harus diisi');
+      toast.warning('Penanggung jawab harus diisi.', 'Form Tidak Lengkap');
       return;
     }
 
@@ -96,34 +117,27 @@ const BarangKeluarUser = () => {
       setSubmitSuccess(true);
       setTimeout(() => setSubmitSuccess(false), 2000);
 
-      showAlertMessage('success', 'Barang keluar berhasil ditambahkan');
+      toast.success(
+        `${formData.jumlah} ${selectedProduct.satuan} ${selectedProduct.nama_barang} berhasil dicatat keluar.`,
+        'Barang Keluar Berhasil'
+      );
 
-      setFormData({
-        product_id: '',
-        jumlah: '',
-        keterangan: '',
-        penanggung_jawab: ''
-      });
+      setFormData({ product_id: '', jumlah: '', keterangan: '', penanggung_jawab: '' });
       setSelectedProduct(null);
-
       fetchInitialData();
 
     } catch (error) {
       console.error('Error submitting:', error);
-      showAlertMessage('error', error.response?.data?.message || 'Gagal menambahkan barang keluar');
+      toast.error(error.response?.data?.message || 'Gagal menambahkan barang keluar.', 'Error');
     } finally {
       setSubmitLoading(false);
     }
   };
 
   const handleReset = () => {
-    setFormData({
-      product_id: '',
-      jumlah: '',
-      keterangan: '',
-      penanggung_jawab: ''
-    });
+    setFormData({ product_id: '', jumlah: '', keterangan: '', penanggung_jawab: '' });
     setSelectedProduct(null);
+    setProductSearch('');
   };
 
   const getButtonStyle = () => {
@@ -135,27 +149,8 @@ const BarangKeluarUser = () => {
 
   return (
     <div className="space-y-6">
-      {/* Alert */}
-      {showAlert.show && (
-        <div className={`rounded-xl p-4 border ${
-          showAlert.type === 'success' 
-            ? 'bg-green-50 border-green-200' 
-            : 'bg-red-50 border-red-200'
-        }`}>
-          <div className="flex items-center gap-3">
-            {showAlert.type === 'success' ? (
-              <CheckCircle className="w-5 h-5 text-green-600" />
-            ) : (
-              <AlertCircle className="w-5 h-5 text-red-600" />
-            )}
-            <p className={`text-sm font-medium ${
-              showAlert.type === 'success' ? 'text-green-800' : 'text-red-800'
-            }`}>
-              {showAlert.message}
-            </p>
-          </div>
-        </div>
-      )}
+      <GlobalStyles />
+      <ToastContainer toasts={toast.toasts} onRemove={toast.remove} />
 
       {/* Header */}
       <div className="bg-gradient-to-r from-red-600 to-red-800 rounded-2xl p-6 text-white shadow-lg">
@@ -173,38 +168,116 @@ const BarangKeluarUser = () => {
       {/* Form */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <form onSubmit={handleSubmit} className="space-y-6">
-          
-          {/* Select Product Dropdown */}
+
+          {/**/}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
               Pilih Produk <span className="text-red-500">*</span>
             </label>
-            <div className="relative">
-              <Package className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none z-10" />
-              <select
-                value={formData.product_id}
-                onChange={(e) => handleSelectProduct(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent appearance-none bg-white"
+
+            <div ref={dropdownRef} className="relative">
+              {/* Trigger button */}
+              <button
+                type="button"
+                onClick={() => !loading && setShowDropdown(prev => !prev)}
                 disabled={loading}
+                className="w-full flex items-center justify-between px-4 py-3 border border-gray-300 rounded-xl bg-white hover:bg-gray-50 focus:ring-2 focus:ring-red-500 focus:outline-none transition-all disabled:opacity-60 disabled:cursor-not-allowed text-left"
               >
-                <option value="">
-                  {loading ? 'Memuat produk...' : 'Pilih produk'}
-                </option>
-                {products.map((product) => (
-                  <option key={product.product_id} value={product.product_id}>
-                    {product.kode_barang} - {product.nama_barang} (Stok: {product.stok})
-                  </option>
-                ))}
-              </select>
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </div>
+                <div className="flex items-center gap-2 min-w-0">
+                  <Package className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                  {loading ? (
+                    <span className="text-sm text-gray-400">Memuat produk...</span>
+                  ) : selectedProduct ? (
+                    <div className="min-w-0">
+                      <span className="text-sm font-semibold text-gray-900 truncate block">
+                        {selectedProduct.nama_barang}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        {selectedProduct.kode_barang} · Stok: {selectedProduct.stok} {selectedProduct.satuan}
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-sm text-gray-400">Pilih produk...</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                  {selectedProduct && (
+                    <span
+                      onClick={(e) => { e.stopPropagation(); handleClearProduct(); }}
+                      className="p-1 hover:bg-gray-200 rounded-full cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5 text-gray-500" />
+                    </span>
+                  )}
+                  <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${showDropdown ? 'rotate-180' : ''}`} />
+                </div>
+              </button>
+
+              {/* Dropdown panel */}
+              {showDropdown && (
+                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-xl shadow-2xl overflow-hidden">
+                  {/* Search input */}
+                  <div className="p-3 border-b border-gray-100 bg-red-50">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-red-400" />
+                      <input
+                        type="text"
+                        value={productSearch}
+                        onChange={(e) => setProductSearch(e.target.value)}
+                        placeholder="Cari nama atau kode barang..."
+                        className="w-full pl-9 pr-4 py-2 border border-red-300 rounded-lg text-sm focus:outline-none focus:border-red-500"
+                        autoFocus
+                      />
+                    </div>
+                  </div>
+
+                  {/* Scrollable list */}
+                  <div className="max-h-60 overflow-y-auto">
+                    {filteredProducts.length === 0 ? (
+                      <div className="px-4 py-8 text-center text-sm text-gray-400">
+                        <Package className="w-10 h-10 mx-auto mb-2 text-gray-300" />
+                        Produk tidak ditemukan
+                      </div>
+                    ) : (
+                      filteredProducts.map(product => (
+                        <div
+                          key={product.product_id}
+                          onClick={() => handleSelectProduct(product)}
+                          className={`px-4 py-3 cursor-pointer hover:bg-red-50 transition-colors border-b border-gray-50 last:border-b-0 ${
+                            selectedProduct?.product_id === product.product_id ? 'bg-red-50' : ''
+                          }`}
+                        >
+                          <p className={`text-sm font-semibold ${
+                            selectedProduct?.product_id === product.product_id ? 'text-red-700' : 'text-gray-900'
+                          }`}>
+                            {product.nama_barang}
+                          </p>
+                          <div className="flex justify-between items-center mt-0.5">
+                            <span className="text-xs font-mono text-gray-400 bg-gray-100 px-2 py-0.5 rounded">
+                              {product.kode_barang}
+                            </span>
+                            <span className={`text-xs font-semibold ${
+                              product.stok > 10 ? 'text-green-600' : 'text-orange-500'
+                            }`}>
+                              Stok: {product.stok} {product.satuan}
+                            </span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  {/* Footer count */}
+                  <div className="px-4 py-2 bg-gray-50 border-t border-gray-100 text-xs text-gray-400 text-right">
+                    {filteredProducts.length} produk tersedia
+                  </div>
+                </div>
+              )}
             </div>
           </div>
+          {/**/}
 
-          {/* Selected Product Info */}
+          {/* Selected Product Info Card */}
           {selectedProduct && (
             <div className="bg-red-50 border border-red-200 rounded-xl p-4">
               <div className="flex items-start justify-between">
@@ -234,10 +307,7 @@ const BarangKeluarUser = () => {
                 </div>
                 <button
                   type="button"
-                  onClick={() => {
-                    setSelectedProduct(null);
-                    setFormData({ ...formData, product_id: '' });
-                  }}
+                  onClick={handleClearProduct}
                   className="text-gray-400 hover:text-gray-600"
                 >
                   <X className="w-5 h-5" />

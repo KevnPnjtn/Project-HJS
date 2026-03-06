@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Download, Eye, FileText, Printer } from 'lucide-react';
+import { Download, Eye, FileText, Printer } from 'lucide-react';
+import { GlobalStyles, ToastContainer } from '../../components/ui/SharedComponents';
+import { useToast } from '../../components/ui/sharedHooks';
 import { stockopnameapi } from '../../services/stockopnameapi';
 import * as XLSX from 'xlsx';
 
@@ -11,14 +13,13 @@ const LaporanOpnameAdmin = () => {
     status_penyesuaian: 'all'
   });
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+
+  const toast = useToast();
 
   useEffect(() => {
     const today = new Date();
     const lastWeek = new Date(today);
     lastWeek.setDate(today.getDate() - 7);
-    
     setFilters({
       tanggal_mulai: lastWeek.toISOString().split('T')[0],
       tanggal_selesai: today.toISOString().split('T')[0],
@@ -35,10 +36,9 @@ const LaporanOpnameAdmin = () => {
   const fetchLaporan = async () => {
     try {
       setLoading(true);
-      setError('');
       const response = await stockopnameapi.getAll();
       const allData = response.data?.data || [];
-      
+
       let filtered = allData.filter(item => {
         const itemDate = new Date(item.tanggal_opname);
         const startDate = new Date(filters.tanggal_mulai);
@@ -48,27 +48,21 @@ const LaporanOpnameAdmin = () => {
 
       if (filters.status_penyesuaian !== 'all') {
         filtered = filtered.filter(item => {
-          if (filters.status_penyesuaian === 'disesuaikan') {
-            return item.status_penyesuaian === 'Disesuaikan';
-          } else if (filters.status_penyesuaian === 'belum') {
-            return item.status_penyesuaian === 'Belum Disesuaikan';
-          }
+          if (filters.status_penyesuaian === 'disesuaikan') return item.status_penyesuaian === 'Disesuaikan';
+          if (filters.status_penyesuaian === 'belum') return item.status_penyesuaian === 'Belum Disesuaikan';
           return true;
         });
       }
 
       setFilteredData(filtered);
     } catch (err) {
-      console.error('Error fetching laporan:', err);
-      setError('Gagal memuat data laporan');
+      toast.error(err.response?.data?.message || 'Gagal memuat data laporan.', 'Error');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleTampilkanLaporan = () => {
-    fetchLaporan();
-  };
+  const handleTampilkanLaporan = () => fetchLaporan();
 
   const handleExportExcel = () => {
     try {
@@ -89,7 +83,7 @@ const LaporanOpnameAdmin = () => {
       const ws = XLSX.utils.json_to_sheet(exportData);
 
       ws['!cols'] = [
-        { wch: 5 },  { wch: 12 }, { wch: 15 }, { wch: 30 },
+        { wch: 5 }, { wch: 12 }, { wch: 15 }, { wch: 30 },
         { wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 18 },
         { wch: 20 }, { wch: 30 }
       ];
@@ -99,231 +93,89 @@ const LaporanOpnameAdmin = () => {
         for (let C = range.s.c; C <= range.e.c; ++C) {
           const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
           if (!ws[cellAddress]) continue;
-          
           if (R === 0) {
             ws[cellAddress].s = {
-              font: { bold: true, color: { rgb: "FFFFFF" } },
-              fill: { fgColor: { rgb: "000000" } },
-              alignment: { horizontal: "center", vertical: "center" },
-              border: {
-                top: { style: "thin", color: { rgb: "000000" } },
-                bottom: { style: "thin", color: { rgb: "000000" } },
-                left: { style: "thin", color: { rgb: "000000" } },
-                right: { style: "thin", color: { rgb: "000000" } }
-              }
+              font: { bold: true, color: { rgb: 'FFFFFF' } },
+              fill: { fgColor: { rgb: '000000' } },
+              alignment: { horizontal: 'center', vertical: 'center' },
+              border: { top: { style: 'thin', color: { rgb: '000000' } }, bottom: { style: 'thin', color: { rgb: '000000' } }, left: { style: 'thin', color: { rgb: '000000' } }, right: { style: 'thin', color: { rgb: '000000' } } }
             };
           } else {
             ws[cellAddress].s = {
-              alignment: { 
-                horizontal: C === 0 || C === 4 || C === 5 || C === 6 ? "center" : "left",
-                vertical: "center" 
-              },
-              border: {
-                top: { style: "thin", color: { rgb: "CCCCCC" } },
-                bottom: { style: "thin", color: { rgb: "CCCCCC" } },
-                left: { style: "thin", color: { rgb: "CCCCCC" } },
-                right: { style: "thin", color: { rgb: "CCCCCC" } }
-              },
-              fill: { fgColor: { rgb: R % 2 === 0 ? "F9FAFB" : "FFFFFF" } }
+              alignment: { horizontal: C === 0 || C === 4 || C === 5 || C === 6 ? 'center' : 'left', vertical: 'center' },
+              border: { top: { style: 'thin', color: { rgb: 'CCCCCC' } }, bottom: { style: 'thin', color: { rgb: 'CCCCCC' } }, left: { style: 'thin', color: { rgb: 'CCCCCC' } }, right: { style: 'thin', color: { rgb: 'CCCCCC' } } },
+              fill: { fgColor: { rgb: R % 2 === 0 ? 'F9FAFB' : 'FFFFFF' } }
             };
           }
         }
       }
 
-      XLSX.utils.book_append_sheet(wb, ws, "Laporan Stok Opname");
+      XLSX.utils.book_append_sheet(wb, ws, 'Laporan Stok Opname');
       const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
       XLSX.writeFile(wb, `Laporan_Stok_Opname_${timestamp}.xlsx`);
-      
-      setSuccess('✓ Data berhasil di-export!');
-      setTimeout(() => setSuccess(''), 3000);
-    } catch (err) {
-      console.error('Error exporting:', err);
-      setError('Gagal export data');
-      setTimeout(() => setError(''), 3000);
+      toast.success('Data berhasil di-export!', 'Export Berhasil');
+    } catch {
+      toast.error('Gagal export data.', 'Export Gagal');
     }
   };
 
-  const handleCetak = () => {
-    window.print();
-  };
+  const handleCetak = () => window.print();
 
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('id-ID', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric'
-    });
-  };
+  const formatDate = (dateString) =>
+    new Date(dateString).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
 
-  const formatDateFull = (dateString) => {
-    return new Date(dateString).toLocaleDateString('id-ID', {
-      day: '2-digit',
-      month: 'long',
-      year: 'numeric'
-    });
-  };
+  const formatDateFull = (dateString) =>
+    new Date(dateString).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
 
-  const totalItems = filteredData.length;
-  const totalDisesuaikan = filteredData.filter(item => item.status_penyesuaian === 'Disesuaikan').length;
-  const totalBelumDisesuaikan = filteredData.filter(item => item.status_penyesuaian === 'Belum Disesuaikan').length;
-  const totalSelisihPositif = filteredData.filter(item => item.selisih > 0).length;
-  const totalSelisihNegatif = filteredData.filter(item => item.selisih < 0).length;
-  const totalSesuai = filteredData.filter(item => item.selisih === 0).length;
+  const totalItems             = filteredData.length;
+  const totalDisesuaikan       = filteredData.filter(i => i.status_penyesuaian === 'Disesuaikan').length;
+  const totalBelumDisesuaikan  = filteredData.filter(i => i.status_penyesuaian === 'Belum Disesuaikan').length;
+  const totalSelisihPositif    = filteredData.filter(i => i.selisih > 0).length;
+  const totalSelisihNegatif    = filteredData.filter(i => i.selisih < 0).length;
+  const totalSesuai            = filteredData.filter(i => i.selisih === 0).length;
 
   return (
     <>
-      {/* Professional Print Styles */}
+      {/* Print Styles */}
       <style>{`
         @media print {
-          body * {
-            visibility: hidden;
-          }
-          .print-area, .print-area * {
-            visibility: visible;
-          }
+          body * { visibility: hidden; }
+          .print-area, .print-area * { visibility: visible; }
           .print-area {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-            padding: 20px;
-            background: white;
+            position: absolute; left: 0; top: 0;
+            width: 100%; padding: 20px; background: white;
           }
-          .no-print {
-            display: none !important;
-          }
-          
-          /* Professional Header */
+          .no-print { display: none !important; }
           .print-header {
-            text-align: center;
-            margin-bottom: 30px;
-            padding-bottom: 15px;
-            border-bottom: 3px double black;
+            text-align: center; margin-bottom: 30px;
+            padding-bottom: 15px; border-bottom: 3px double black;
           }
-          
           .print-header h1 {
-            font-size: 24px;
-            font-weight: bold;
-            margin: 0 0 8px 0;
-            text-transform: uppercase;
-            letter-spacing: 1px;
+            font-size: 24px; font-weight: bold; margin: 0 0 8px 0;
+            text-transform: uppercase; letter-spacing: 1px;
           }
-          
-          .print-header .company-name {
-            font-size: 18px;
-            font-weight: 600;
-            margin-bottom: 5px;
-          }
-          
-          .print-header .period {
-            font-size: 12px;
-            color: #333;
-            margin-top: 8px;
-          }
-          
-
-          /* Table Styles */
-          .print-area table {
-            border-collapse: collapse;
-            width: 100%;
-            border: 2px solid black;
-            font-size: 10px;
-          }
-          
-          .print-area thead {
-            background: #000 !important;
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
-          }
-          
-          .print-area th {
-            background: #000 !important;
-            color: white !important;
-            border: 1px solid black;
-            padding: 8px 6px;
-            font-weight: bold;
-            text-align: center;
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
-          }
-          
-          .print-area td {
-            border: 1px solid black;
-            padding: 6px;
-            color: black;
-          }
-          
-          .print-area tbody tr:nth-child(even) {
-            background: #f9f9f9 !important;
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
-          }
-          
-          /* Status Badges */
-          .badge-disesuaikan {
-            display: inline-block;
-            padding: 3px 8px;
-            border: 1px solid black;
-            background: #e0e0e0 !important;
-            color: black !important;
-            border-radius: 4px;
-            font-weight: bold;
-            font-size: 9px;
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
-          }
-          
-          .badge-belum {
-            display: inline-block;
-            padding: 3px 8px;
-            border: 1px solid black;
-            background: white !important;
-            color: black !important;
-            border-radius: 4px;
-            font-size: 9px;
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
-          }
-          
-          .selisih-positive, .selisih-negative {
-            font-weight: bold;
-          }
-          
-          /* Footer */
-          .print-footer {
-            margin-top: 30px;
-            padding-top: 15px;
-            border-top: 2px solid black;
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 20px;
-            text-align: center;
-          }
-          
-          .print-footer .signature {
-            padding-top: 60px;
-            border-top: 1px solid black;
-            margin-top: 10px;
-          }
-          
-          .print-footer .signature-label {
-            font-size: 11px;
-            font-weight: bold;
-            margin-bottom: 50px;
-          }
-          
-          .print-footer .signature-name {
-            font-size: 11px;
-          }
-          
-          @page {
-            margin: 1.5cm;
-            size: A4 landscape;
-          }
+          .print-header .company-name { font-size: 18px; font-weight: 600; margin-bottom: 5px; }
+          .print-header .period { font-size: 12px; color: #333; margin-top: 8px; }
+          .print-area table { border-collapse: collapse; width: 100%; border: 2px solid black; font-size: 10px; }
+          .print-area thead { background: #000 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .print-area th { background: #000 !important; color: white !important; border: 1px solid black; padding: 8px 6px; font-weight: bold; text-align: center; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .print-area td { border: 1px solid black; padding: 6px; color: black; }
+          .print-area tbody tr:nth-child(even) { background: #f9f9f9 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .badge-disesuaikan { display: inline-block; padding: 3px 8px; border: 1px solid black; background: #e0e0e0 !important; color: black !important; border-radius: 4px; font-weight: bold; font-size: 9px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .badge-belum { display: inline-block; padding: 3px 8px; border: 1px solid black; background: white !important; color: black !important; border-radius: 4px; font-size: 9px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .selisih-positive, .selisih-negative { font-weight: bold; }
+          .print-footer { margin-top: 30px; padding-top: 15px; border-top: 2px solid black; display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; text-align: center; }
+          .print-footer .signature { padding-top: 60px; border-top: 1px solid black; margin-top: 10px; }
+          .print-footer .signature-label { font-size: 11px; font-weight: bold; margin-bottom: 50px; }
+          .print-footer .signature-name { font-size: 11px; }
+          @page { margin: 1.5cm; size: A4 landscape; }
         }
       `}</style>
 
       <div className="space-y-6">
+        <GlobalStyles />
+        <ToastContainer toasts={toast.toasts} onRemove={toast.remove} />
+
         {/* Header - No Print */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 no-print">
           <div className="flex items-center justify-between mb-6">
@@ -336,26 +188,12 @@ const LaporanOpnameAdmin = () => {
             </div>
           </div>
 
-          {/* Success/Error Messages */}
-          {success && (
-            <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg text-green-700">
-              {success}
-            </div>
-          )}
-          {error && (
-            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-              {error}
-            </div>
-          )}
-
           {/* Filter Section */}
           <div className="bg-gray-50 rounded-lg p-5 mb-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Filter Laporan</h2>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Tanggal Mulai
-                </label>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Tanggal Mulai</label>
                 <input
                   type="date"
                   value={filters.tanggal_mulai}
@@ -363,11 +201,8 @@ const LaporanOpnameAdmin = () => {
                   className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
-
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Tanggal Selesai
-                </label>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Tanggal Selesai</label>
                 <input
                   type="date"
                   value={filters.tanggal_selesai}
@@ -375,11 +210,8 @@ const LaporanOpnameAdmin = () => {
                   className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
-
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Status Penyesuaian
-                </label>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Status Penyesuaian</label>
                 <select
                   value={filters.status_penyesuaian}
                   onChange={(e) => setFilters({ ...filters, status_penyesuaian: e.target.value })}
@@ -390,7 +222,6 @@ const LaporanOpnameAdmin = () => {
                   <option value="belum">Tidak Disesuaikan</option>
                 </select>
               </div>
-
               <div className="flex items-end">
                 <button
                   onClick={handleTampilkanLaporan}
@@ -457,7 +288,6 @@ const LaporanOpnameAdmin = () => {
 
         {/* Print Area */}
         <div className="print-area">
-          {/* Professional Print Header */}
           <div className="print-header">
             <div className="company-name">PT. INVENTARIS SYSTEM</div>
             <h1>Laporan Stok Opname</h1>
@@ -468,9 +298,6 @@ const LaporanOpnameAdmin = () => {
             )}
           </div>
 
-
-
-          {/* Report Table */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200">
             <div className="overflow-x-auto">
               <table className="w-full border-collapse">
@@ -504,21 +331,11 @@ const LaporanOpnameAdmin = () => {
                   ) : (
                     filteredData.map((item, index) => (
                       <tr key={item.opname_id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                        <td className="py-2.5 px-4 text-sm text-gray-900 border border-gray-300">
-                          {formatDate(item.tanggal_opname)}
-                        </td>
-                        <td className="py-2.5 px-4 text-sm font-medium text-gray-900 border border-gray-300">
-                          {item.product?.kode_barang || '-'}
-                        </td>
-                        <td className="py-2.5 px-4 text-sm text-gray-900 border border-gray-300">
-                          {item.product?.nama_barang || '-'}
-                        </td>
-                        <td className="py-2.5 px-4 text-center text-sm font-semibold text-gray-900 border border-gray-300">
-                          {item.stok_sistem}
-                        </td>
-                        <td className="py-2.5 px-4 text-center text-sm font-semibold text-gray-900 border border-gray-300">
-                          {item.stok_fisik}
-                        </td>
+                        <td className="py-2.5 px-4 text-sm text-gray-900 border border-gray-300">{formatDate(item.tanggal_opname)}</td>
+                        <td className="py-2.5 px-4 text-sm font-medium text-gray-900 border border-gray-300">{item.product?.kode_barang || '-'}</td>
+                        <td className="py-2.5 px-4 text-sm text-gray-900 border border-gray-300">{item.product?.nama_barang || '-'}</td>
+                        <td className="py-2.5 px-4 text-center text-sm font-semibold text-gray-900 border border-gray-300">{item.stok_sistem}</td>
+                        <td className="py-2.5 px-4 text-center text-sm font-semibold text-gray-900 border border-gray-300">{item.stok_fisik}</td>
                         <td className="py-2.5 px-4 text-center border border-gray-300">
                           <span className={`font-semibold text-sm ${
                             item.selisih > 0 ? 'selisih-positive text-green-700' :
@@ -533,9 +350,7 @@ const LaporanOpnameAdmin = () => {
                             {item.status_penyesuaian === 'Disesuaikan' ? '✓ Disesuaikan' : '⊗ Belum'}
                           </span>
                         </td>
-                        <td className="py-2.5 px-4 text-sm text-gray-900 border border-gray-300">
-                          {item.nama_petugas || '-'}
-                        </td>
+                        <td className="py-2.5 px-4 text-sm text-gray-900 border border-gray-300">{item.nama_petugas || '-'}</td>
                       </tr>
                     ))
                   )}
@@ -550,28 +365,27 @@ const LaporanOpnameAdmin = () => {
             )}
           </div>
 
-          {/* Professional Footer with Signatures */}
           {filteredData.length > 0 && (
             <div className="print-footer">
               <div>
                 <div className="signature-label">Dibuat Oleh,</div>
                 <div className="signature">
                   <div className="signature-name">(_________________)</div>
-                  <div style={{fontSize: '10px', marginTop: '5px'}}>Admin Gudang</div>
+                  <div style={{ fontSize: '10px', marginTop: '5px' }}>Admin Gudang</div>
                 </div>
               </div>
               <div>
                 <div className="signature-label">Diperiksa Oleh,</div>
                 <div className="signature">
                   <div className="signature-name">(_________________)</div>
-                  <div style={{fontSize: '10px', marginTop: '5px'}}>Supervisor</div>
+                  <div style={{ fontSize: '10px', marginTop: '5px' }}>Supervisor</div>
                 </div>
               </div>
               <div>
                 <div className="signature-label">Disetujui Oleh,</div>
                 <div className="signature">
                   <div className="signature-name">(_________________)</div>
-                  <div style={{fontSize: '10px', marginTop: '5px'}}>Manager</div>
+                  <div style={{ fontSize: '10px', marginTop: '5px' }}>Manager</div>
                 </div>
               </div>
             </div>

@@ -15,8 +15,6 @@ class ProductController extends Controller
 {
     public function index(Request $request)
     {
-        // FIX 1: Hapus with('user') — tidak dibutuhkan di tabel produk
-        // FIX 2: Pilih hanya kolom yang dibutuhkan tabel, exclude qr_code (bisa besar)
         $query = Product::select([
             'product_id',
             'kode_barang',
@@ -61,8 +59,6 @@ class ProductController extends Controller
 
         $products = $query->latest()->paginate($request->per_page ?? 5);
 
-        // FIX 3: Hapus debug queries dari response — jangan expose SQL ke client
-        // Log tetap jalan di server tapi tidak dikirim ke frontend
         Log::info('ProductController@index', [
             'per_page' => $request->per_page ?? 5,
             'page'     => $request->page ?? 1,
@@ -120,7 +116,6 @@ class ProductController extends Controller
 
     public function show($id)
     {
-        // show() boleh load relasi & semua field karena hanya dipanggil saat edit
         $product = Product::with(['user', 'qrLogs', 'stockTransactions'])
             ->find($id);
 
@@ -187,11 +182,10 @@ class ProductController extends Controller
             DB::commit();
             Cache::forget("product_{$product->product_id}");
 
-            // Return hanya field yang dibutuhkan, exclude qr_code dari response
             return response()->json([
                 'success' => true,
                 'message' => 'Product created successfully',
-                'data'    => $product->fresh([
+                'data' => $product->fresh()->only([
                     'product_id', 'kode_barang', 'nama_barang',
                     'jenis_barang', 'satuan', 'stok', 'stok_minimal', 'status',
                     'harga_modal', 'harga_jual',
