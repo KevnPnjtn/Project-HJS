@@ -1,43 +1,57 @@
-Frontend: React Application
+# Frontend — React Application
 
-Aplikasi tampilan ini dibuat menggunakan React dan Vite. Frontend berfungsi sebagai Single Page Application (SPA) yang fokus pada presentasi data, interaksi pengguna, dan routing di sisi klien.
+Aplikasi tampilan ini dibuat menggunakan **React** dan **Vite**. Frontend berfungsi sebagai *Single Page Application* (SPA) yang fokus pada presentasi data, interaksi pengguna, dan routing di sisi klien untuk **Project HJS — Warehouse Management System (WMS)**.
 
-⚙️ Teknologi Utama
+---
 
-Framework: React.js (Hooks & Functional Components)
+## Teknologi Utama
 
-Bundler: Vite
+| Komponen | Teknologi |
+|---|---|
+| Framework | React.js (Hooks & Functional Components) |
+| Bundler | Vite |
+| Styling | Tailwind CSS / CSS Modules |
+| HTTP Client | Axios atau Fetch API |
+| State Management | React Hooks (`useState`, `useContext`) |
 
-Styling: Tailwind CSS / CSS Modules
+---
 
-HTTP Client: Axios atau Fetch API
+## Instalasi dan Menjalankan
 
-State Management: React Hooks (useState, useContext)
+Langkah-langkah berikut dilakukan di dalam direktori `/frontend`.
 
-🛠️ Instalasi dan Menjalankan
+### 1. Instal Dependensi JavaScript
 
-Langkah-langkah ini harus dilakukan di direktori /frontend:
+Pastikan **Node.js (v18+)** dan **npm** sudah terinstal, lalu jalankan:
 
-Instal Dependensi JavaScript:
-Pastikan Anda memiliki Node.js (v18+) dan npm terinstal.
-
+```bash
 npm install
+```
 
+### 2. Konfigurasi Variabel Lingkungan
 
-Konfigurasi Variabel Lingkungan:
-Buat file .env.local (atau .env) di direktori /frontend dan tambahkan URL API backend:
+Buat file `.env.local` (atau `.env`) di direktori `/frontend`, lalu tambahkan URL API backend berikut. Pastikan nilai ini menunjuk ke server Laravel yang sedang berjalan (lihat [backend/README.md](../backend/README.md)):
 
-# Pastikan ini menunjuk ke server Laravel Anda
-VITE_API_URL=[http://127.0.0.1:8000/api](http://127.0.0.1:8000/api)
+```env
+VITE_API_URL=http://127.0.0.1:8000/api
+```
 
+### 3. Jalankan Aplikasi Development
 
-Jalankan Aplikasi Development:
-
+```bash
 npm run dev
+```
 
+Aplikasi akan terbuka di browser, umumnya pada `http://localhost:5173`.
 
-Aplikasi akan terbuka di browser Anda (misalnya http://localhost:5173).
+---
 
-📡 Koneksi API
+## Koneksi API
 
-Semua permintaan data (GET, POST, PUT, DELETE) dari aplikasi React diarahkan ke base URL yang didefinisikan dalam VITE_API_URL. Pastikan server Backend sedang berjalan sebelum menjalankan Frontend.
+Semua permintaan data (`GET`, `POST`, `PUT`, `DELETE`) dari aplikasi React diarahkan ke *base URL* yang didefinisikan dalam `VITE_API_URL`. Pastikan server **Backend** sudah berjalan terlebih dahulu sebelum menjalankan **Frontend** — lihat langkah instalasi backend di [backend/README.md](../backend/README.md).
+
+---
+
+## Terkait
+
+Dokumentasi utama proyek beserta gambaran umum sistem, fitur, dan arsitektur keseluruhan dapat dilihat pada [README utama](../README.md).

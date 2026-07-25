@@ -1,70 +1,69 @@
-Backend: Laravel RESTful API
+# Backend — Laravel RESTful API
 
-Direktori ini berisi kode sumber untuk RESTful API yang dibuat dengan Laravel. Backend ini adalah lapisan service yang bertanggung jawab atas logika bisnis, otentikasi, dan manajemen database.
+Direktori ini berisi kode sumber untuk RESTful API yang dibuat dengan Laravel. Backend ini adalah lapisan service yang bertanggung jawab atas logika bisnis, otentikasi, dan manajemen database pada **Project HJS — Warehouse Management System (WMS)**.
 
-⚙️ Teknologi Utama
+---
 
-Framework: Laravel (PHP)
+## Teknologi Utama
 
-Database: MySQL
+| Komponen | Teknologi |
+|---|---|
+| Framework | Laravel (PHP) |
+| Database | MySQL |
+| Autentikasi | Laravel Sanctum (disarankan untuk SPA) atau Passport |
+| Server | PHP Built-in Server / Nginx / Apache |
 
-Autentikasi: Laravel Sanctum (disarankan untuk SPA) atau Passport
+---
 
-Server: PHP Built-in Server atau Nginx/Apache
+## Instalasi dan Menjalankan
 
-🛠️ Instalasi dan Menjalankan
+Langkah-langkah berikut dilakukan di dalam direktori `/backend`.
 
-Langkah-langkah ini harus dilakukan di direktori /backend:
+### 1. Instal Dependensi PHP
 
-Instal Dependensi PHP:
-Pastikan Anda memiliki PHP (v8.1+) dan Composer terinstal.
+Pastikan **PHP (v8.1+)** dan **Composer** sudah terinstal, lalu jalankan:
 
+```bash
 composer install
+```
 
+### 2. Konfigurasi Database dan Lingkungan
 
-Konfigurasi Database dan Lingkungan:
-Salin file .env.example ke .env dan atur kunci unik serta kredensial database Anda.
+Salin file `.env.example` menjadi `.env`, lalu generate kunci aplikasi:
 
+```bash
 cp .env.example .env
 php artisan key:generate
+```
 
+Atur variabel `DB_DATABASE`, `DB_USERNAME`, dan `DB_PASSWORD` dengan kredensial database Anda di file `.env`.
 
-Atur variabel DB_DATABASE, DB_USERNAME, dan DB_PASSWORD dengan benar di file .env.
+### 3. Migrasi dan Seeding Database
 
-Migrasi dan Seeding Database:
-
+```bash
 php artisan migrate --seed
+```
 
+### 4. Jalankan Server Development
 
-Jalankan Server Development:
-
+```bash
 php artisan serve
+```
 
+API akan berjalan pada `http://127.0.0.1:8000`.
 
-API akan berjalan, biasanya di http://127.0.0.1:8000.
+---
 
-🔑 Autentikasi dan Endpoint
+## Autentikasi dan Endpoint
 
-Metode
+| Metode | Endpoint | Deskripsi |
+|---|---|---|
+| POST | `/api/register` | Pendaftaran pengguna baru. |
+| POST | `/api/login` | Otentikasi dan pemberian token. |
+| GET | `/api/user` | Mendapatkan data pengguna yang sedang login (membutuhkan Token Bearer). |
 
-Endpoint
+---
 
-Deskripsi
+## Terkait
 
-POST
-
-/api/register
-
-Pendaftaran pengguna baru.
-
-POST
-
-/api/login
-
-Otentikasi dan pemberian token.
-
-GET
-
-/api/user
-
-Mendapatkan data pengguna yang sedang login (Membutuhkan Token Bearer).
+Dokumentasi utama proyek beserta gambaran umum sistem, fitur, dan cara menjalankan Frontend dapat dilihat pada [README utama](../README.md).
